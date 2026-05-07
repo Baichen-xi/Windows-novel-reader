@@ -1,6 +1,5 @@
 using NovelShelf.Models;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Text.Json;
 
@@ -19,6 +18,7 @@ public sealed class LibraryStore
 
     public string BooksDirectory => Path.Combine(AppDataDirectory, "books");
     public string LibraryPath => Path.Combine(AppDataDirectory, "library.json");
+    public string SettingsPath => Path.Combine(AppDataDirectory, "settings.json");
 
     public IReadOnlyList<BookInfo> Load()
     {
@@ -38,6 +38,26 @@ public sealed class LibraryStore
         Directory.CreateDirectory(BooksDirectory);
         var json = JsonSerializer.Serialize(books, JsonOptions);
         File.WriteAllText(LibraryPath, json);
+    }
+
+    public ReaderSettings LoadSettings()
+    {
+        Directory.CreateDirectory(AppDataDirectory);
+
+        if (!File.Exists(SettingsPath))
+        {
+            return new ReaderSettings();
+        }
+
+        var json = File.ReadAllText(SettingsPath);
+        return JsonSerializer.Deserialize<ReaderSettings>(json) ?? new ReaderSettings();
+    }
+
+    public void SaveSettings(ReaderSettings settings)
+    {
+        Directory.CreateDirectory(AppDataDirectory);
+        var json = JsonSerializer.Serialize(settings, JsonOptions);
+        File.WriteAllText(SettingsPath, json);
     }
 
     public BookInfo Import(string sourcePath)

@@ -13,14 +13,21 @@ public partial class MainWindow : Window
 {
     private readonly LibraryStore _store = new();
     private readonly ObservableCollection<BookInfo> _books = new();
+    private readonly ObservableCollection<ChapterInfo> _chapters = new();
+    private readonly ReaderSettings _settings;
     private BookInfo? _currentBook;
     private ScrollViewer? _readerScrollViewer;
     private bool _isLoadingBook;
+    private bool _isNavigatingChapter;
+    private int _lastSearchIndex = -1;
 
     public MainWindow()
     {
         InitializeComponent();
+        _settings = _store.LoadSettings();
         BooksList.ItemsSource = _books;
+        ChaptersList.ItemsSource = _chapters;
+        ApplySettingsToControls();
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -37,6 +44,7 @@ public partial class MainWindow : Window
     {
         SaveVisiblePosition();
         _store.Save(_books);
+        _store.SaveSettings(_settings);
     }
 
     private void LoadLibrary()
@@ -86,12 +94,20 @@ public partial class MainWindow : Window
 
     private void BooksList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (BooksList.SelectedItem is not BookInfo book)
+        if (BooksList.SelectedItem is BookInfo book)
+        {
+            OpenBook(book);
+        }
+    }
+
+    private void ChaptersList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isNavigatingChapter || ChaptersList.SelectedItem is not ChapterInfo chapter)
         {
             return;
         }
 
-        OpenBook(book);
+        NavigateToOffset(chapter.CharacterOffset, saveToBook: true);
     }
 
     private void OpenBook(BookInfo book)
@@ -99,26 +115,65 @@ public partial class MainWindow : Window
         SaveVisiblePosition();
         _currentBook = book;
         _isLoadingBook = true;
+        _lastSearchIndex = -1;
 
         try
         {
             ReaderTextBox.Text = TextFileReader.Read(book.StoredPath);
             TitleText.Text = book.Title;
             MetaText.Text = $"来源：{book.OriginalFileName} · 导入时间：{book.ImportedAt:yyyy-MM-dd HH:mm}";
-            StatusText.Text = $"阅读位置：{book.CharacterOffset:N0} / {ReaderTextBox.Text.Length:N0}";
-
-            ReaderTextBox.CaretIndex = Math.Clamp(book.CharacterOffset, 0, ReaderTextBox.Text.Length);
-            ReaderTextBox.ScrollToLine(GetLineIndex(ReaderTextBox.CaretIndex));
+            RefreshChapters(ReaderTextBox.Text);
+            NavigateToOffset(book.CharacterOffset, saveToBook: false);
+            UpdateStatus();
         }
         catch (Exception ex)
         {
             ReaderTextBox.Text = "";
+            _chapters.Clear();
             MessageBox.Show(this, ex.Message, "打开失败", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
             _isLoadingBook = false;
         }
+    }
+
+    private void RefreshChapters(string text)
+    {
+        _chapters.Clear();
+        foreach (var chapter in ChapterParser.Extract(text))
+        {
+            _chapters.Add(chapter);
+        }
+
+        if (_chapters.Count == 0)
+        {
+            StatusText.Text = "未识别到章节，可以继续作为整本书阅读。";
+        }
+    }
+
+    private void PreviousChapter_Click(object sender, RoutedEventArgs e)
+    {
+        if (_chapters.Count == 0)
+        {
+            return;
+        }
+
+        var index = ChaptersList.SelectedIndex <= 0 ? 0 : ChaptersList.SelectedIndex - 1;
+        ChaptersList.SelectedIndex = index;
+        NavigateToOffset(_chapters[index].CharacterOffset, saveToBook: true);
+    }
+
+    private void NextChapter_Click(object sender, RoutedEventArgs e)
+    {
+        if (_chapters.Count == 0)
+        {
+            return;
+        }
+
+        var index = ChaptersList.SelectedIndex < 0 ? 0 : Math.Min(_chapters.Count - 1, ChaptersList.SelectedIndex + 1);
+        ChaptersList.SelectedIndex = index;
+        NavigateToOffset(_chapters[index].CharacterOffset, saveToBook: true);
     }
 
     private void SavePosition_Click(object sender, RoutedEventArgs e)
@@ -152,10 +207,45 @@ public partial class MainWindow : Window
         _store.DeleteBookFile(book);
         _store.Save(_books);
         _currentBook = null;
+        _chapters.Clear();
         ReaderTextBox.Text = "";
         TitleText.Text = "还没有打开小说";
         MetaText.Text = "";
         StatusText.Text = "已从本地书库移除。";
+    }
+
+    private void FindNext_Click(object sender, RoutedEventArgs e)
+    {
+        FindText(forward: true);
+    }
+
+    private void FindPrevious_Click(object sender, RoutedEventArgs e)
+    {
+        FindText(forward: false);
+    }
+
+    private void FontSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!IsLoaded && ReaderTextBox is null)
+        {
+            return;
+        }
+
+        _settings.FontSize = e.NewValue;
+        ReaderTextBox.FontSize = e.NewValue;
+        _store.SaveSettings(_settings);
+    }
+
+    private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ThemeComboBox.SelectedItem is not ComboBoxItem item || item.Tag is not string theme)
+        {
+            return;
+        }
+
+        _settings.Theme = theme;
+        ApplyTheme(theme);
+        _store.SaveSettings(_settings);
     }
 
     private void ReaderTextBox_SelectionChanged(object sender, RoutedEventArgs e)
@@ -164,6 +254,80 @@ public partial class MainWindow : Window
         {
             SaveVisiblePosition();
         }
+    }
+
+    private void FindText(bool forward)
+    {
+        var query = SearchBox.Text.Trim();
+        var text = ReaderTextBox.Text;
+        if (query.Length == 0 || text.Length == 0)
+        {
+            StatusText.Text = "请输入要查找的关键词。";
+            return;
+        }
+
+        var comparison = StringComparison.CurrentCultureIgnoreCase;
+        var start = ReaderTextBox.SelectionStart;
+        int index;
+
+        if (forward)
+        {
+            start = _lastSearchIndex >= 0 ? _lastSearchIndex + query.Length : start + ReaderTextBox.SelectionLength;
+            if (start >= text.Length)
+            {
+                start = 0;
+            }
+
+            index = text.IndexOf(query, start, comparison);
+            if (index < 0 && start > 0)
+            {
+                index = text.IndexOf(query, 0, comparison);
+            }
+        }
+        else
+        {
+            start = _lastSearchIndex > 0 ? _lastSearchIndex - 1 : Math.Max(0, start - 1);
+            index = text.LastIndexOf(query, start, comparison);
+            if (index < 0 && start < text.Length - 1)
+            {
+                index = text.LastIndexOf(query, text.Length - 1, comparison);
+            }
+        }
+
+        if (index < 0)
+        {
+            StatusText.Text = $"没有找到：{query}";
+            return;
+        }
+
+        _lastSearchIndex = index;
+        ReaderTextBox.Focus();
+        ReaderTextBox.Select(index, query.Length);
+        ReaderTextBox.ScrollToLine(GetLineIndex(index));
+        NavigateToOffset(index, saveToBook: true);
+        StatusText.Text = $"已找到：{query}";
+    }
+
+    private void NavigateToOffset(int characterOffset, bool saveToBook)
+    {
+        if (ReaderTextBox.Text.Length == 0)
+        {
+            return;
+        }
+
+        var offset = Math.Clamp(characterOffset, 0, ReaderTextBox.Text.Length);
+        ReaderTextBox.CaretIndex = offset;
+        ReaderTextBox.ScrollToLine(GetLineIndex(offset));
+
+        if (saveToBook && _currentBook is not null)
+        {
+            _currentBook.CharacterOffset = offset;
+            _currentBook.LastReadAt = DateTimeOffset.Now;
+            _store.Save(_books);
+        }
+
+        UpdateSelectedChapter(offset);
+        UpdateStatus();
     }
 
     private void SaveVisiblePosition()
@@ -185,7 +349,90 @@ public partial class MainWindow : Window
 
         _currentBook.CharacterOffset = Math.Clamp(offset, 0, ReaderTextBox.Text.Length);
         _currentBook.LastReadAt = DateTimeOffset.Now;
-        StatusText.Text = $"阅读位置：{_currentBook.CharacterOffset:N0} / {ReaderTextBox.Text.Length:N0}";
+        UpdateSelectedChapter(_currentBook.CharacterOffset);
+        UpdateStatus();
+    }
+
+    private void UpdateSelectedChapter(int offset)
+    {
+        if (_chapters.Count == 0)
+        {
+            return;
+        }
+
+        var selected = _chapters[0];
+        foreach (var chapter in _chapters)
+        {
+            if (chapter.CharacterOffset > offset)
+            {
+                break;
+            }
+
+            selected = chapter;
+        }
+
+        _isNavigatingChapter = true;
+        ChaptersList.SelectedItem = selected;
+        ChaptersList.ScrollIntoView(selected);
+        _isNavigatingChapter = false;
+    }
+
+    private void UpdateStatus()
+    {
+        if (_currentBook is null || ReaderTextBox.Text.Length == 0)
+        {
+            return;
+        }
+
+        var chapterText = ChaptersList.SelectedItem is ChapterInfo chapter
+            ? $" · {chapter.Title}"
+            : "";
+        StatusText.Text = $"阅读位置：{_currentBook.CharacterOffset:N0} / {ReaderTextBox.Text.Length:N0}{chapterText}";
+    }
+
+    private void ApplySettingsToControls()
+    {
+        FontSizeSlider.Value = _settings.FontSize;
+        ReaderTextBox.FontSize = _settings.FontSize;
+
+        foreach (var item in ThemeComboBox.Items.OfType<ComboBoxItem>())
+        {
+            if (string.Equals(item.Tag as string, _settings.Theme, StringComparison.OrdinalIgnoreCase))
+            {
+                ThemeComboBox.SelectedItem = item;
+                break;
+            }
+        }
+
+        if (ThemeComboBox.SelectedItem is null)
+        {
+            ThemeComboBox.SelectedIndex = 0;
+        }
+
+        ApplyTheme(_settings.Theme);
+    }
+
+    private void ApplyTheme(string theme)
+    {
+        var palette = theme switch
+        {
+            "Dark" => new ThemePalette("#171717", "#222222", "#2A2A2A", "#E8E3D8", "#B8AEA1", "#3A564A"),
+            "Green" => new ThemePalette("#E7F0E7", "#F4FAF1", "#F4FAF1", "#263326", "#65755F", "#4F765C"),
+            _ => new ThemePalette("#F5F1E8", "#FFFCF5", "#FFFCF5", "#2A2118", "#7A7066", "#426B5A")
+        };
+
+        Background = BrushFrom(palette.AppBackground);
+        RootGrid.Background = BrushFrom(palette.AppBackground);
+        SidebarBorder.Background = BrushFrom(palette.PanelBackground);
+        ReaderBorder.Background = BrushFrom(palette.ReaderBackground);
+        ReaderBorder.BorderBrush = BrushFrom(palette.Border);
+        ReaderTextBox.Background = BrushFrom(palette.ReaderBackground);
+        ReaderTextBox.Foreground = BrushFrom(palette.Text);
+        TitleText.Foreground = BrushFrom(palette.Text);
+        MetaText.Foreground = BrushFrom(palette.MutedText);
+        StatusText.Foreground = BrushFrom(palette.MutedText);
+        BooksList.Background = BrushFrom(palette.PanelBackground);
+        ChaptersList.Background = BrushFrom(palette.PanelBackground);
     }
 
     private int GetLineIndex(int characterIndex)
@@ -197,6 +444,8 @@ public partial class MainWindow : Window
 
         return Math.Max(0, ReaderTextBox.GetLineIndexFromCharacterIndex(characterIndex));
     }
+
+    private static Brush BrushFrom(string color) => (Brush)new BrushConverter().ConvertFromString(color)!;
 
     private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
     {
@@ -217,5 +466,12 @@ public partial class MainWindow : Window
 
         return null;
     }
-}
 
+    private sealed record ThemePalette(
+        string AppBackground,
+        string PanelBackground,
+        string ReaderBackground,
+        string Text,
+        string MutedText,
+        string Border);
+}

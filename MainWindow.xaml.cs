@@ -62,6 +62,8 @@ public partial class MainWindow : Window
         {
             BooksList.SelectedIndex = 0;
         }
+
+        UpdateLibraryCount();
     }
 
     private void ImportBook_Click(object sender, RoutedEventArgs e)
@@ -83,6 +85,7 @@ public partial class MainWindow : Window
             var imported = _store.Import(dialog.FileName);
             _books.Add(imported);
             _store.Save(_books);
+            UpdateLibraryCount();
             BooksList.SelectedItem = imported;
             StatusText.Text = $"已导入：{imported.Title}";
         }
@@ -146,6 +149,8 @@ public partial class MainWindow : Window
             _chapters.Add(chapter);
         }
 
+        UpdateCatalogCount();
+
         if (_chapters.Count == 0)
         {
             StatusText.Text = "未识别到章节，可以继续作为整本书阅读。";
@@ -208,6 +213,8 @@ public partial class MainWindow : Window
         _store.Save(_books);
         _currentBook = null;
         _chapters.Clear();
+        UpdateLibraryCount();
+        UpdateCatalogCount();
         ReaderTextBox.Text = "";
         TitleText.Text = "还没有打开小说";
         MetaText.Text = "";
@@ -390,6 +397,20 @@ public partial class MainWindow : Window
         StatusText.Text = $"阅读位置：{_currentBook.CharacterOffset:N0} / {ReaderTextBox.Text.Length:N0}{chapterText}";
     }
 
+    private void UpdateLibraryCount()
+    {
+        LibraryCountText.Text = _books.Count == 0
+            ? "0 本本地小说"
+            : $"{_books.Count} 本本地小说";
+    }
+
+    private void UpdateCatalogCount()
+    {
+        CatalogCountText.Text = _chapters.Count == 0
+            ? "尚未载入章节"
+            : $"{_chapters.Count} 个章节";
+    }
+
     private void ApplySettingsToControls()
     {
         FontSizeSlider.Value = _settings.FontSize;
@@ -423,16 +444,29 @@ public partial class MainWindow : Window
 
         Background = BrushFrom(palette.AppBackground);
         RootGrid.Background = BrushFrom(palette.AppBackground);
-        SidebarBorder.Background = BrushFrom(palette.PanelBackground);
+        AppHeaderBorder.Background = BrushFrom(palette.PanelBackground);
+        AppHeaderBorder.BorderBrush = BrushFrom(palette.Border);
+        LibraryBorder.Background = BrushFrom(palette.PanelBackground);
+        LibraryBorder.BorderBrush = BrushFrom(palette.Border);
+        CatalogBorder.Background = BrushFrom(palette.PanelBackground);
+        CatalogBorder.BorderBrush = BrushFrom(palette.Border);
+        CatalogHintBorder.Background = BrushFrom(palette.ReaderBackground);
+        CatalogHintBorder.BorderBrush = BrushFrom(palette.Border);
+        ReaderToolbarBorder.Background = BrushFrom(palette.PanelBackground);
+        ReaderToolbarBorder.BorderBrush = BrushFrom(palette.Border);
         ReaderBorder.Background = BrushFrom(palette.ReaderBackground);
         ReaderBorder.BorderBrush = BrushFrom(palette.Border);
         ReaderTextBox.Background = BrushFrom(palette.ReaderBackground);
         ReaderTextBox.Foreground = BrushFrom(palette.Text);
-        TitleText.Foreground = BrushFrom(palette.Text);
+        SetTextForeground(RootGrid, BrushFrom(palette.Text));
         MetaText.Foreground = BrushFrom(palette.MutedText);
         StatusText.Foreground = BrushFrom(palette.MutedText);
+        LibraryCountText.Foreground = BrushFrom(palette.MutedText);
+        CatalogCountText.Foreground = BrushFrom(palette.MutedText);
         BooksList.Background = BrushFrom(palette.PanelBackground);
+        BooksList.Foreground = BrushFrom(palette.Text);
         ChaptersList.Background = BrushFrom(palette.PanelBackground);
+        ChaptersList.Foreground = BrushFrom(palette.Text);
     }
 
     private int GetLineIndex(int characterIndex)
@@ -446,6 +480,20 @@ public partial class MainWindow : Window
     }
 
     private static Brush BrushFrom(string color) => (Brush)new BrushConverter().ConvertFromString(color)!;
+
+    private static void SetTextForeground(DependencyObject parent, Brush brush)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is TextBlock textBlock)
+            {
+                textBlock.Foreground = brush;
+            }
+
+            SetTextForeground(child, brush);
+        }
+    }
 
     private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
     {

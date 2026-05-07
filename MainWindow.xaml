@@ -1,0 +1,109 @@
+<Window x:Class="NovelShelf.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="NovelShelf"
+        Width="1120"
+        Height="760"
+        MinWidth="860"
+        MinHeight="560"
+        Background="{StaticResource AppBackground}"
+        Loaded="Window_Loaded"
+        Closing="Window_Closing">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="12,7"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Background" Value="#426B5A"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style TargetType="ListBox">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="{StaticResource PanelBackground}"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0"
+                Background="{StaticResource PanelBackground}"
+                BorderBrush="#E1D8C9"
+                BorderThickness="0,0,1,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="18,18,18,12">
+                    <TextBlock Text="NovelShelf"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="本地小说阅读器"
+                               Margin="0,4,0,14"
+                               Foreground="{StaticResource TextMuted}"/>
+                    <Button Content="导入 TXT 小说" Click="ImportBook_Click"/>
+                </StackPanel>
+
+                <ListBox x:Name="BooksList"
+                         DisplayMemberPath="Title"
+                         SelectionChanged="BooksList_SelectionChanged"
+                         Margin="10,0,10,16"/>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="28,22,28,24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <DockPanel Grid.Row="0" LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="保存位置" Click="SavePosition_Click"/>
+                    <Button Content="移除" Background="#8C4A3B" Click="RemoveBook_Click"/>
+                </StackPanel>
+
+                <StackPanel>
+                    <TextBlock x:Name="TitleText"
+                               Text="还没有打开小说"
+                               FontSize="26"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock x:Name="MetaText"
+                               Margin="0,4,0,0"
+                               Foreground="{StaticResource TextMuted}"/>
+                </StackPanel>
+            </DockPanel>
+
+            <Border Grid.Row="1"
+                    Margin="0,20,0,14"
+                    Padding="34,28"
+                    Background="#FFFCF5"
+                    BorderBrush="#E1D8C9"
+                    BorderThickness="1">
+                <TextBox x:Name="ReaderTextBox"
+                         AcceptsReturn="True"
+                         AcceptsTab="True"
+                         Background="#FFFCF5"
+                         BorderThickness="0"
+                         FontFamily="Microsoft YaHei UI"
+                         FontSize="20"
+                         Foreground="{StaticResource TextPrimary}"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Disabled"
+                         SelectionChanged="ReaderTextBox_SelectionChanged"/>
+            </Border>
+
+            <TextBlock x:Name="StatusText"
+                       Grid.Row="2"
+                       Foreground="{StaticResource TextMuted}"
+                       Text="导入一本本地 TXT 文件开始阅读。"/>
+        </Grid>
+    </Grid>
+</Window>

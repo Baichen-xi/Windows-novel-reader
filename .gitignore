@@ -1,0 +1,21 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local novel files should never be committed.
+# The app stores imported books under:
+# %LOCALAPPDATA%\NovelShelf\books
+local-books/
+books/
+novels/
+library/
+*.epub
+*.txt
+*.mobi
+*.azw3
+*.pdf
+

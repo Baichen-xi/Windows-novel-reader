@@ -163,6 +163,7 @@
                          FontSize="18"
                          Foreground="#2C2C2C"
                          IsReadOnly="True"
+                         IsUndoEnabled="False"
                          TextWrapping="Wrap"
                          VerticalScrollBarVisibility="Hidden"
                          HorizontalScrollBarVisibility="Disabled"

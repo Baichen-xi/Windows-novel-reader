@@ -20,12 +20,14 @@ public partial class MainWindow : Window
     private BookInfo? _currentBook;
     private ScrollViewer? _readerScrollViewer;
     private readonly DispatcherTimer _clockTimer = new();
+    private readonly DispatcherTimer _positionUpdateTimer = new();
     private bool _isLoadingBook;
     private bool _isNavigatingChapter;
     private bool _isLibraryVisible;
     private bool _isCatalogVisible;
     private bool _isOptionsVisible;
     private bool _isUpdatingProgress;
+    private int _lastSelectedChapterIndex = -1;
     private int _lastSearchIndex = -1;
 
     public MainWindow()
@@ -36,6 +38,7 @@ public partial class MainWindow : Window
         ChaptersList.ItemsSource = _chapters;
         ApplySettingsToControls();
         ConfigureClock();
+        ConfigurePositionUpdateTimer();
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -44,7 +47,7 @@ public partial class MainWindow : Window
         _readerScrollViewer = FindVisualChild<ScrollViewer>(ReaderTextBox);
         if (_readerScrollViewer is not null)
         {
-            _readerScrollViewer.ScrollChanged += (_, _) => SaveVisiblePosition();
+            _readerScrollViewer.ScrollChanged += (_, _) => ScheduleVisiblePositionSave();
         }
     }
 
@@ -54,6 +57,7 @@ public partial class MainWindow : Window
         _store.Save(_books);
         _store.SaveSettings(_settings);
         _clockTimer.Stop();
+        _positionUpdateTimer.Stop();
     }
 
     private void LoadLibrary()
@@ -127,6 +131,7 @@ public partial class MainWindow : Window
         SaveVisiblePosition();
         _currentBook = book;
         _isLoadingBook = true;
+        _lastSelectedChapterIndex = -1;
         _lastSearchIndex = -1;
 
         try
@@ -157,6 +162,7 @@ public partial class MainWindow : Window
     private void RefreshChapters(string text)
     {
         _chapters.Clear();
+        _lastSelectedChapterIndex = -1;
         foreach (var chapter in ChapterParser.Extract(text))
         {
             _chapters.Add(chapter);
@@ -270,6 +276,11 @@ public partial class MainWindow : Window
         ControlLayer.Visibility = ControlLayer.Visibility == Visibility.Visible
             ? Visibility.Collapsed
             : Visibility.Visible;
+
+        if (ControlLayer.Visibility == Visibility.Visible)
+        {
+            UpdateStatus();
+        }
     }
 
     private void Bookmark_Click(object sender, RoutedEventArgs e)
@@ -333,7 +344,7 @@ public partial class MainWindow : Window
     {
         if (!_isLoadingBook)
         {
-            SaveVisiblePosition();
+            ScheduleVisiblePositionSave();
         }
     }
 
@@ -434,6 +445,17 @@ public partial class MainWindow : Window
         UpdateStatus();
     }
 
+    private void ScheduleVisiblePositionSave()
+    {
+        if (_currentBook is null || _isLoadingBook || ReaderTextBox.Text.Length == 0)
+        {
+            return;
+        }
+
+        _positionUpdateTimer.Stop();
+        _positionUpdateTimer.Start();
+    }
+
     private void UpdateSelectedChapter(int offset)
     {
         if (_chapters.Count == 0)
@@ -441,20 +463,37 @@ public partial class MainWindow : Window
             return;
         }
 
-        var selected = _chapters[0];
-        foreach (var chapter in _chapters)
-        {
-            if (chapter.CharacterOffset > offset)
-            {
-                break;
-            }
+        var low = 0;
+        var high = _chapters.Count - 1;
+        var selectedIndex = 0;
 
-            selected = chapter;
+        while (low <= high)
+        {
+            var mid = low + ((high - low) / 2);
+            if (_chapters[mid].CharacterOffset <= offset)
+            {
+                selectedIndex = mid;
+                low = mid + 1;
+            }
+            else
+            {
+                high = mid - 1;
+            }
         }
 
+        if (selectedIndex == _lastSelectedChapterIndex)
+        {
+            return;
+        }
+
+        var selected = _chapters[selectedIndex];
+        _lastSelectedChapterIndex = selectedIndex;
         _isNavigatingChapter = true;
         ChaptersList.SelectedItem = selected;
-        ChaptersList.ScrollIntoView(selected);
+        if (_isCatalogVisible)
+        {
+            ChaptersList.ScrollIntoView(selected);
+        }
         _isNavigatingChapter = false;
     }
 
@@ -479,9 +518,12 @@ public partial class MainWindow : Window
         BottomProgressText.Text = $"{percentage:P0}";
         StatusText.Text = $"阅读位置：{_currentBook.CharacterOffset:N0} / {ReaderTextBox.Text.Length:N0}{chapterText}";
 
-        _isUpdatingProgress = true;
-        ChapterProgressSlider.Value = percentage * 100;
-        _isUpdatingProgress = false;
+        if (ControlLayer.Visibility == Visibility.Visible)
+        {
+            _isUpdatingProgress = true;
+            ChapterProgressSlider.Value = percentage * 100;
+            _isUpdatingProgress = false;
+        }
     }
 
     private void SetLibraryVisible(bool visible)
@@ -494,6 +536,10 @@ public partial class MainWindow : Window
     {
         _isCatalogVisible = visible;
         CatalogColumn.Width = visible ? new GridLength(300) : new GridLength(0);
+        if (visible && ChaptersList.SelectedItem is ChapterInfo chapter)
+        {
+            ChaptersList.ScrollIntoView(chapter);
+        }
     }
 
     private void SetOptionsVisible(bool visible)
@@ -573,6 +619,16 @@ public partial class MainWindow : Window
         _clockTimer.Tick += (_, _) => UpdateClock();
         UpdateClock();
         _clockTimer.Start();
+    }
+
+    private void ConfigurePositionUpdateTimer()
+    {
+        _positionUpdateTimer.Interval = TimeSpan.FromMilliseconds(250);
+        _positionUpdateTimer.Tick += (_, _) =>
+        {
+            _positionUpdateTimer.Stop();
+            SaveVisiblePosition();
+        };
     }
 
     private void UpdateClock()

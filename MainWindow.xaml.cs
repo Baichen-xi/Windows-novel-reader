@@ -5,7 +5,9 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace NovelShelf;
 
@@ -17,11 +19,13 @@ public partial class MainWindow : Window
     private readonly ReaderSettings _settings;
     private BookInfo? _currentBook;
     private ScrollViewer? _readerScrollViewer;
+    private readonly DispatcherTimer _clockTimer = new();
     private bool _isLoadingBook;
     private bool _isNavigatingChapter;
-    private bool _isLibraryVisible = true;
+    private bool _isLibraryVisible;
     private bool _isCatalogVisible;
-    private bool _isOptionsVisible = true;
+    private bool _isOptionsVisible;
+    private bool _isUpdatingProgress;
     private int _lastSearchIndex = -1;
 
     public MainWindow()
@@ -31,6 +35,7 @@ public partial class MainWindow : Window
         BooksList.ItemsSource = _books;
         ChaptersList.ItemsSource = _chapters;
         ApplySettingsToControls();
+        ConfigureClock();
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -48,6 +53,7 @@ public partial class MainWindow : Window
         SaveVisiblePosition();
         _store.Save(_books);
         _store.SaveSettings(_settings);
+        _clockTimer.Stop();
     }
 
     private void LoadLibrary()
@@ -127,7 +133,6 @@ public partial class MainWindow : Window
         {
             ReaderTextBox.Text = TextFileReader.Read(book.StoredPath);
             TitleText.Text = book.Title;
-            HeaderBookText.Text = book.Title;
             MetaText.Text = $"来源：{book.OriginalFileName} · 导入时间：{book.ImportedAt:yyyy-MM-dd HH:mm}";
             RefreshChapters(ReaderTextBox.Text);
             if (_chapters.Count > 0)
@@ -225,7 +230,6 @@ public partial class MainWindow : Window
         UpdateCatalogCount();
         ReaderTextBox.Text = "";
         TitleText.Text = "还没有打开小说";
-        HeaderBookText.Text = "本地小说阅读器";
         CurrentChapterText.Text = "阅读区";
         MetaText.Text = "";
         StatusText.Text = "已从本地书库移除。";
@@ -254,6 +258,51 @@ public partial class MainWindow : Window
     private void ToggleOptions_Click(object sender, RoutedEventArgs e)
     {
         SetOptionsVisible(!_isOptionsVisible);
+    }
+
+    private void ReaderSurface_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject source && IsInteractiveElement(source))
+        {
+            return;
+        }
+
+        ControlLayer.Visibility = ControlLayer.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+    }
+
+    private void Bookmark_Click(object sender, RoutedEventArgs e)
+    {
+        SaveVisiblePosition();
+        _store.Save(_books);
+        StatusText.Text = "已记录当前位置。";
+    }
+
+    private void ReadAloud_Click(object sender, RoutedEventArgs e)
+    {
+        StatusText.Text = "朗读功能还未接入，入口已预留。";
+    }
+
+    private void CycleTheme_Click(object sender, RoutedEventArgs e)
+    {
+        var themes = new[] { "Ink", "Dark", "Green", "Vintage" };
+        var index = Array.IndexOf(themes, _settings.Theme);
+        _settings.Theme = themes[(index + 1 + themes.Length) % themes.Length];
+        SelectThemeComboItem(_settings.Theme);
+        ApplyTheme(_settings.Theme);
+        _store.SaveSettings(_settings);
+    }
+
+    private void ChapterProgressSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_isUpdatingProgress || ReaderTextBox is null || ReaderTextBox.Text.Length == 0)
+        {
+            return;
+        }
+
+        var offset = (int)Math.Round(ReaderTextBox.Text.Length * e.NewValue / 100);
+        NavigateToOffset(offset, saveToBook: true);
     }
 
     private void FontSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -422,7 +471,17 @@ public partial class MainWindow : Window
         CurrentChapterText.Text = ChaptersList.SelectedItem is ChapterInfo currentChapter
             ? currentChapter.Title
             : "阅读区";
+        var progress = ReaderTextBox.Text.Length == 0
+            ? 0
+            : (double)_currentBook.CharacterOffset / ReaderTextBox.Text.Length;
+        var percentage = Math.Clamp(progress, 0, 1);
+
+        BottomProgressText.Text = $"{percentage:P0}";
         StatusText.Text = $"阅读位置：{_currentBook.CharacterOffset:N0} / {ReaderTextBox.Text.Length:N0}{chapterText}";
+
+        _isUpdatingProgress = true;
+        ChapterProgressSlider.Value = percentage * 100;
+        _isUpdatingProgress = false;
     }
 
     private void SetLibraryVisible(bool visible)
@@ -461,20 +520,8 @@ public partial class MainWindow : Window
     {
         FontSizeSlider.Value = _settings.FontSize;
         ReaderTextBox.FontSize = _settings.FontSize;
-
-        foreach (var item in ThemeComboBox.Items.OfType<ComboBoxItem>())
-        {
-            if (string.Equals(item.Tag as string, _settings.Theme, StringComparison.OrdinalIgnoreCase))
-            {
-                ThemeComboBox.SelectedItem = item;
-                break;
-            }
-        }
-
-        if (ThemeComboBox.SelectedItem is null)
-        {
-            ThemeComboBox.SelectedIndex = 0;
-        }
+        _settings.Theme = NormalizeTheme(_settings.Theme);
+        SelectThemeComboItem(_settings.Theme);
 
         ApplyTheme(_settings.Theme);
     }
@@ -483,15 +530,14 @@ public partial class MainWindow : Window
     {
         var palette = theme switch
         {
-            "Dark" => new ThemePalette("#171717", "#222222", "#2A2A2A", "#E8E3D8", "#B8AEA1", "#3A564A"),
-            "Green" => new ThemePalette("#E7F0E7", "#F4FAF1", "#F4FAF1", "#263326", "#65755F", "#4F765C"),
-            _ => new ThemePalette("#F5F1E8", "#FFFCF5", "#FFFCF5", "#2A2118", "#7A7066", "#426B5A")
+            "Dark" => new ThemePalette("#1A1C1E", "#222528", "#1A1C1E", "#A0A0A0", "#7D8288", "#2D3237", "#DD222528"),
+            "Green" => new ThemePalette("#CCE8CF", "#D9EEDB", "#CCE8CF", "#3E4E42", "#667765", "#AECFB2", "#DDD9EEDB"),
+            "Vintage" => new ThemePalette("#EAD8B1", "#F0DFC0", "#EAD8B1", "#5D4037", "#7B6159", "#D3B783", "#DDF0DFC0"),
+            _ => new ThemePalette("#F4F1EA", "#F8F5EE", "#F4F1EA", "#2C2C2C", "#77736B", "#D6CDBF", "#DDF8F5EE")
         };
 
         Background = BrushFrom(palette.AppBackground);
         RootGrid.Background = BrushFrom(palette.AppBackground);
-        AppHeaderBorder.Background = BrushFrom(palette.PanelBackground);
-        AppHeaderBorder.BorderBrush = BrushFrom(palette.Border);
         LibraryBorder.Background = BrushFrom(palette.PanelBackground);
         LibraryBorder.BorderBrush = BrushFrom(palette.Border);
         CatalogBorder.Background = BrushFrom(palette.PanelBackground);
@@ -501,26 +547,62 @@ public partial class MainWindow : Window
         ReaderSurfaceGrid.Background = BrushFrom(palette.AppBackground);
         CatalogHintBorder.Background = BrushFrom(palette.ReaderBackground);
         CatalogHintBorder.BorderBrush = BrushFrom(palette.Border);
-        ReaderToolbarBorder.Background = BrushFrom(palette.PanelBackground);
-        ReaderToolbarBorder.BorderBrush = BrushFrom(palette.Border);
-        ReaderProgressBorder.Background = BrushFrom(palette.PanelBackground);
-        ReaderProgressBorder.BorderBrush = BrushFrom(palette.Border);
         ReaderBorder.Background = BrushFrom(palette.ReaderBackground);
-        ReaderBorder.BorderBrush = BrushFrom(palette.Border);
+        ReaderBorder.BorderBrush = BrushFrom(palette.ReaderBackground);
         ReaderTextBox.Background = BrushFrom(palette.ReaderBackground);
         ReaderTextBox.Foreground = BrushFrom(palette.Text);
+        ControlPanelBorder.Background = BrushFrom(palette.OverlayBackground);
+        ControlPanelBorder.BorderBrush = BrushFrom(palette.Border);
         SetTextForeground(RootGrid, BrushFrom(palette.Text));
         MetaText.Foreground = BrushFrom(palette.MutedText);
         StatusText.Foreground = BrushFrom(palette.MutedText);
         LibraryCountText.Foreground = BrushFrom(palette.MutedText);
         CatalogCountText.Foreground = BrushFrom(palette.MutedText);
-        HeaderBookText.Foreground = BrushFrom(palette.MutedText);
         CurrentChapterText.Foreground = BrushFrom(palette.MutedText);
+        BottomProgressText.Foreground = BrushFrom(palette.MutedText);
+        ClockText.Foreground = BrushFrom(palette.MutedText);
         BooksList.Background = BrushFrom(palette.PanelBackground);
         BooksList.Foreground = BrushFrom(palette.Text);
         ChaptersList.Background = BrushFrom(palette.PanelBackground);
         ChaptersList.Foreground = BrushFrom(palette.Text);
     }
+
+    private void ConfigureClock()
+    {
+        _clockTimer.Interval = TimeSpan.FromSeconds(10);
+        _clockTimer.Tick += (_, _) => UpdateClock();
+        UpdateClock();
+        _clockTimer.Start();
+    }
+
+    private void UpdateClock()
+    {
+        ClockText.Text = DateTime.Now.ToString("HH:mm");
+    }
+
+    private void SelectThemeComboItem(string theme)
+    {
+        foreach (var item in ThemeComboBox.Items.OfType<ComboBoxItem>())
+        {
+            if (string.Equals(item.Tag as string, theme, StringComparison.OrdinalIgnoreCase))
+            {
+                ThemeComboBox.SelectedItem = item;
+                return;
+            }
+        }
+
+        ThemeComboBox.SelectedIndex = 0;
+    }
+
+    private static string NormalizeTheme(string theme) => theme switch
+    {
+        "Paper" => "Ink",
+        "浅墨" => "Ink",
+        "深夜" => "Dark",
+        "护眼" => "Green",
+        "复古" => "Vintage",
+        _ => theme
+    };
 
     private int GetLineIndex(int characterIndex)
     {
@@ -533,6 +615,31 @@ public partial class MainWindow : Window
     }
 
     private static Brush BrushFrom(string color) => (Brush)new BrushConverter().ConvertFromString(color)!;
+
+    private static bool IsInteractiveElement(DependencyObject source)
+    {
+        while (source is not null)
+        {
+            if (source is FrameworkElement { Name: "ReaderTextBox" })
+            {
+                return false;
+            }
+
+            if (source is FrameworkElement { Name: "ControlPanelBorder" })
+            {
+                return true;
+            }
+
+            if (source is ButtonBase or TextBox or Slider or ComboBox or ListBox)
+            {
+                return true;
+            }
+
+            source = VisualTreeHelper.GetParent(source);
+        }
+
+        return false;
+    }
 
     private static void SetTextForeground(DependencyObject parent, Brush brush)
     {
@@ -574,5 +681,6 @@ public partial class MainWindow : Window
         string ReaderBackground,
         string Text,
         string MutedText,
-        string Border);
+        string Border,
+        string OverlayBackground);
 }

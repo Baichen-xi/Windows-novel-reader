@@ -6,7 +6,7 @@
         Height="840"
         MinWidth="1080"
         MinHeight="680"
-        Background="{StaticResource AppBackground}"
+        Background="#F4F1EA"
         Loaded="Window_Loaded"
         Closing="Window_Closing">
     <Window.Resources>
@@ -21,9 +21,9 @@
             <Setter Property="MinHeight" Value="32"/>
         </Style>
         <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="#00000000"/>
+            <Setter Property="Background" Value="#14FFFFFF"/>
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="BorderBrush" Value="#D7CBB9"/>
+            <Setter Property="BorderBrush" Value="#50A89F91"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
         <Style TargetType="ListBox">
@@ -31,295 +31,299 @@
             <Setter Property="Background" Value="{StaticResource PanelBackground}"/>
         </Style>
         <Style TargetType="TextBox">
-            <Setter Property="BorderBrush" Value="#D7CBB9"/>
+            <Setter Property="BorderBrush" Value="#50A89F91"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,5"/>
         </Style>
         <Style TargetType="ComboBox">
-            <Setter Property="BorderBrush" Value="#D7CBB9"/>
+            <Setter Property="BorderBrush" Value="#50A89F91"/>
             <Setter Property="Padding" Value="6,4"/>
-            <Setter Property="MinWidth" Value="94"/>
+            <Setter Property="MinWidth" Value="112"/>
         </Style>
     </Window.Resources>
 
     <Grid x:Name="RootGrid">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="58"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="LibraryColumn" Width="0"/>
+            <ColumnDefinition x:Name="CatalogColumn" Width="0"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition x:Name="OptionsColumn" Width="0"/>
+        </Grid.ColumnDefinitions>
 
-        <Border x:Name="AppHeaderBorder"
-                Grid.Row="0"
-                Padding="18,0"
-                Background="{StaticResource PanelBackground}"
-                BorderBrush="#E1D8C9"
-                BorderThickness="0,0,0,1">
-            <DockPanel LastChildFill="True">
-                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="书架" Style="{StaticResource GhostButton}" Click="ToggleLibrary_Click"/>
-                    <Button Content="目录" Style="{StaticResource GhostButton}" Click="ToggleCatalog_Click"/>
-                    <Button Content="设置" Style="{StaticResource GhostButton}" Click="ToggleOptions_Click"/>
-                </StackPanel>
-
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="上一章" Style="{StaticResource GhostButton}" Click="PreviousChapter_Click"/>
-                    <Button Content="下一章" Style="{StaticResource GhostButton}" Click="NextChapter_Click"/>
-                    <Button Content="保存位置" Click="SavePosition_Click"/>
-                    <Button Content="移除" Background="#8C4A3B" Click="RemoveBook_Click"/>
-                </StackPanel>
-
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <TextBlock Text="NovelShelf"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimary}"
-                               VerticalAlignment="Center"/>
-                    <TextBlock Text=" · "
-                               Foreground="{StaticResource TextMuted}"
-                               VerticalAlignment="Center"/>
-                    <TextBlock x:Name="HeaderBookText"
-                               Text="本地小说阅读器"
-                               Foreground="{StaticResource TextMuted}"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
-            </DockPanel>
-        </Border>
-
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="LibraryColumn" Width="280"/>
-                <ColumnDefinition x:Name="CatalogColumn" Width="0"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition x:Name="OptionsColumn" Width="260"/>
-            </Grid.ColumnDefinitions>
-
-            <Border x:Name="LibraryBorder"
-                    Grid.Column="0"
-                    Background="{StaticResource PanelBackground}"
-                    BorderBrush="#E1D8C9"
-                    BorderThickness="0,0,1,0">
-                <Grid Margin="18">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <StackPanel Grid.Row="0">
-                        <TextBlock Text="书架"
-                                   FontSize="20"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock x:Name="LibraryCountText"
-                                   Text="0 本本地小说"
-                                   Margin="0,4,0,14"
-                                   Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
-
-                    <Button Grid.Row="1"
-                            Content="导入 TXT 小说"
-                            Click="ImportBook_Click"
-                            Margin="0,0,0,14"/>
-
-                    <ListBox x:Name="BooksList"
-                             Grid.Row="2"
-                             DisplayMemberPath="Title"
-                             SelectionChanged="BooksList_SelectionChanged"/>
-                </Grid>
-            </Border>
-
-            <Border x:Name="CatalogBorder"
-                    Grid.Column="1"
-                    Background="{StaticResource PanelBackground}"
-                    BorderBrush="#E1D8C9"
-                    BorderThickness="0,0,1,0">
-                <Grid Margin="18">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <StackPanel Grid.Row="0">
-                        <TextBlock Text="目录"
-                                   FontSize="20"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock x:Name="CatalogCountText"
-                                   Text="尚未载入章节"
-                                   Margin="0,4,0,14"
-                                   Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
-
-                    <Border x:Name="CatalogHintBorder"
-                            Grid.Row="1"
-                            Padding="10,8"
-                            Margin="0,0,0,12"
-                            Background="#F0E8DA"
-                            BorderBrush="#E1D8C9"
-                            BorderThickness="1">
-                        <TextBlock Text="点击章节即可跳转到正文。"
-                                   TextWrapping="Wrap"
-                                   Foreground="{StaticResource TextMuted}"/>
-                    </Border>
-
-                    <ListBox x:Name="ChaptersList"
-                             Grid.Row="2"
-                             DisplayMemberPath="Title"
-                             SelectionChanged="ChaptersList_SelectionChanged"/>
-                </Grid>
-            </Border>
-
-            <Grid x:Name="ReaderSurfaceGrid"
-                  Grid.Column="2"
-                  Margin="0">
+        <Border x:Name="LibraryBorder"
+                Grid.Column="0"
+                Background="#F8F5EE"
+                BorderBrush="#40A89F91"
+                BorderThickness="0,0,1,0">
+            <Grid Margin="18">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Border x:Name="ReaderToolbarBorder"
-                        Grid.Row="0"
-                        Margin="28,18,28,0"
-                        Padding="12,10"
-                        Background="{StaticResource PanelBackground}"
-                        BorderBrush="#E1D8C9"
-                        BorderThickness="1">
-                    <DockPanel LastChildFill="True">
-                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
-                            <TextBox x:Name="SearchBox"
-                                     Width="250"
-                                     VerticalContentAlignment="Center"
-                                     ToolTip="输入关键词后搜索"/>
-                            <Button Content="查找" Margin="8,0,8,0" Click="FindNext_Click"/>
-                            <Button Content="上一个" Style="{StaticResource GhostButton}" Click="FindPrevious_Click"/>
-                        </StackPanel>
+                <StackPanel Grid.Row="0">
+                    <TextBlock Text="书架"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock x:Name="LibraryCountText"
+                               Text="0 本本地小说"
+                               Margin="0,4,0,14"
+                               Foreground="{StaticResource TextMuted}"/>
+                </StackPanel>
 
-                        <StackPanel HorizontalAlignment="Right">
-                            <TextBlock x:Name="TitleText"
-                                       Text="还没有打开小说"
-                                       FontSize="17"
-                                       FontWeight="SemiBold"
-                                       TextAlignment="Right"
-                                       Foreground="{StaticResource TextPrimary}"/>
-                            <TextBlock x:Name="MetaText"
-                                       Margin="0,3,0,0"
-                                       TextAlignment="Right"
-                                       Foreground="{StaticResource TextMuted}"/>
-                        </StackPanel>
-                    </DockPanel>
-                </Border>
+                <Button Grid.Row="1"
+                        Content="导入 TXT 小说"
+                        Click="ImportBook_Click"
+                        Margin="0,0,0,14"/>
 
-                <Grid Grid.Row="1" Margin="28,18,28,16">
-                    <Border x:Name="ReaderBorder"
-                            Width="820"
-                            HorizontalAlignment="Center"
-                            Padding="58,44"
-                            Background="#FFFCF5"
-                            BorderBrush="#E1D8C9"
-                            BorderThickness="1">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock x:Name="CurrentChapterText"
-                                       Grid.Row="0"
-                                       Text="阅读区"
-                                       Margin="0,0,0,18"
-                                       FontSize="14"
-                                       Foreground="{StaticResource TextMuted}"
-                                       TextAlignment="Center"/>
-
-                            <TextBox x:Name="ReaderTextBox"
-                                     Grid.Row="1"
-                                     AcceptsReturn="True"
-                                     AcceptsTab="True"
-                                     Background="#FFFCF5"
-                                     BorderThickness="0"
-                                     FontFamily="Microsoft YaHei UI"
-                                     FontSize="20"
-                                     Foreground="{StaticResource TextPrimary}"
-                                     IsReadOnly="True"
-                                     TextWrapping="Wrap"
-                                     VerticalScrollBarVisibility="Auto"
-                                     HorizontalScrollBarVisibility="Disabled"
-                                     SelectionChanged="ReaderTextBox_SelectionChanged"/>
-                        </Grid>
-                    </Border>
-                </Grid>
-
-                <Border x:Name="ReaderProgressBorder"
-                        Grid.Row="2"
-                        Margin="28,0,28,22"
-                        Padding="14,10"
-                        HorizontalAlignment="Center"
-                        Width="820"
-                        Background="{StaticResource PanelBackground}"
-                        BorderBrush="#E1D8C9"
-                        BorderThickness="1">
-                    <TextBlock x:Name="StatusText"
-                               Foreground="{StaticResource TextMuted}"
-                               TextAlignment="Center"
-                               Text="导入一本本地 TXT 文件开始阅读。"/>
-                </Border>
+                <ListBox x:Name="BooksList"
+                         Grid.Row="2"
+                         DisplayMemberPath="Title"
+                         SelectionChanged="BooksList_SelectionChanged"/>
             </Grid>
+        </Border>
 
-            <Border x:Name="OptionsBorder"
-                    Grid.Column="3"
-                    Background="{StaticResource PanelBackground}"
-                    BorderBrush="#E1D8C9"
-                    BorderThickness="1,0,0,0">
-                <Grid Margin="18">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+        <Border x:Name="CatalogBorder"
+                Grid.Column="1"
+                Background="#F8F5EE"
+                BorderBrush="#40A89F91"
+                BorderThickness="0,0,1,0">
+            <Grid Margin="18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0">
-                        <TextBlock Text="阅读设置"
-                                   FontSize="20"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="本机保存"
-                                   Margin="0,4,0,18"
-                                   Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
+                <StackPanel Grid.Row="0">
+                    <TextBlock Text="目录"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock x:Name="CatalogCountText"
+                               Text="尚未载入章节"
+                               Margin="0,4,0,14"
+                               Foreground="{StaticResource TextMuted}"/>
+                </StackPanel>
 
-                    <StackPanel Grid.Row="1" Margin="0,0,0,18">
-                        <TextBlock Text="字号"
-                                   Foreground="{StaticResource TextMuted}"
-                                   Margin="0,0,0,8"/>
-                        <Slider x:Name="FontSizeSlider"
-                                Minimum="14"
-                                Maximum="32"
-                                TickFrequency="1"
-                                IsSnapToTickEnabled="True"
-                                ValueChanged="FontSizeSlider_ValueChanged"/>
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="2" Margin="0,0,0,18">
-                        <TextBlock Text="主题"
-                                   Foreground="{StaticResource TextMuted}"
-                                   Margin="0,0,0,8"/>
-                        <ComboBox x:Name="ThemeComboBox"
-                                  SelectionChanged="ThemeComboBox_SelectionChanged">
-                            <ComboBoxItem Content="纸张" Tag="Paper"/>
-                            <ComboBoxItem Content="夜间" Tag="Dark"/>
-                            <ComboBoxItem Content="护眼" Tag="Green"/>
-                        </ComboBox>
-                    </StackPanel>
-
-                    <TextBlock Grid.Row="3"
-                               Text="小说文件保存在 %LOCALAPPDATA%\NovelShelf\books，不会上传到 GitHub。"
+                <Border x:Name="CatalogHintBorder"
+                        Grid.Row="1"
+                        Padding="10,8"
+                        Margin="0,0,0,12"
+                        Background="#F4F1EA"
+                        BorderBrush="#40A89F91"
+                        BorderThickness="1">
+                    <TextBlock Text="点击章节即可跳转到正文。"
                                TextWrapping="Wrap"
                                Foreground="{StaticResource TextMuted}"/>
-                </Grid>
+                </Border>
+
+                <ListBox x:Name="ChaptersList"
+                         Grid.Row="2"
+                         DisplayMemberPath="Title"
+                         SelectionChanged="ChaptersList_SelectionChanged"/>
+            </Grid>
+        </Border>
+
+        <Grid x:Name="ReaderSurfaceGrid"
+              Grid.Column="2"
+              MouseLeftButtonUp="ReaderSurface_Click">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="42"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="42"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock x:Name="CurrentChapterText"
+                       Grid.Row="0"
+                       Text="阅读区"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       FontSize="12"
+                       Foreground="{StaticResource TextMuted}"
+                       Opacity="0.72"/>
+
+            <Border x:Name="ReaderBorder"
+                    Grid.Row="1"
+                    MaxWidth="880"
+                    MinWidth="620"
+                    HorizontalAlignment="Center"
+                    Padding="72,46"
+                    Background="#F4F1EA"
+                    BorderBrush="#00000000"
+                    BorderThickness="1">
+                <TextBox x:Name="ReaderTextBox"
+                         AcceptsReturn="True"
+                         AcceptsTab="True"
+                         Background="#F4F1EA"
+                         BorderThickness="0"
+                         FontFamily="Microsoft YaHei UI"
+                         FontSize="18"
+                         Foreground="#2C2C2C"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Hidden"
+                         HorizontalScrollBarVisibility="Disabled"
+                         SelectionChanged="ReaderTextBox_SelectionChanged"/>
             </Border>
+
+            <DockPanel Grid.Row="2" Margin="36,0" LastChildFill="True">
+                <TextBlock x:Name="BottomProgressText"
+                           DockPanel.Dock="Left"
+                           Text="0%"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{StaticResource TextMuted}"
+                           Opacity="0.72"/>
+                <TextBlock x:Name="ClockText"
+                           DockPanel.Dock="Right"
+                           Text="--:--"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{StaticResource TextMuted}"
+                           Opacity="0.72"/>
+                <TextBlock x:Name="StatusText"
+                           Text="导入一本本地 TXT 文件开始阅读。"
+                           TextAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{StaticResource TextMuted}"
+                           Opacity="0.72"/>
+            </DockPanel>
+
+            <Grid x:Name="ControlLayer"
+                  Grid.RowSpan="3"
+                  Visibility="Collapsed"
+                  Background="#66000000">
+                <Border x:Name="ControlPanelBorder"
+                        Width="760"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Stretch"
+                        Margin="0,28"
+                        Padding="22"
+                        Background="#DDF8F5EE"
+                        BorderBrush="#50A89F91"
+                        BorderThickness="1">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <DockPanel Grid.Row="0" LastChildFill="True">
+                            <Button DockPanel.Dock="Left"
+                                    Content="返回"
+                                    Style="{StaticResource GhostButton}"
+                                    Click="ToggleLibrary_Click"/>
+                            <Button DockPanel.Dock="Right"
+                                    Content="书签"
+                                    Style="{StaticResource GhostButton}"
+                                    Click="Bookmark_Click"/>
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock x:Name="TitleText"
+                                           Text="还没有打开小说"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           TextAlignment="Center"
+                                           Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock x:Name="MetaText"
+                                           Margin="0,4,0,0"
+                                           TextAlignment="Center"
+                                           Foreground="{StaticResource TextMuted}"/>
+                            </StackPanel>
+                        </DockPanel>
+
+                        <StackPanel Grid.Row="1"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Center"
+                                    Width="520">
+                            <TextBox x:Name="SearchBox"
+                                     Height="34"
+                                     VerticalContentAlignment="Center"
+                                     ToolTip="输入关键词后搜索"/>
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center"
+                                        Margin="0,12,0,0">
+                                <Button Content="查找" Click="FindNext_Click"/>
+                                <Button Content="上一个" Style="{StaticResource GhostButton}" Click="FindPrevious_Click"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="2">
+                            <Slider x:Name="ChapterProgressSlider"
+                                    Minimum="0"
+                                    Maximum="100"
+                                    Height="30"
+                                    IsMoveToPointEnabled="True"
+                                    ValueChanged="ChapterProgressSlider_ValueChanged"/>
+                            <UniformGrid Columns="4" Margin="0,12,0,0">
+                                <Button Content="目录" Style="{StaticResource GhostButton}" Click="ToggleCatalog_Click"/>
+                                <Button Content="设置" Style="{StaticResource GhostButton}" Click="ToggleOptions_Click"/>
+                                <Button Content="模式" Style="{StaticResource GhostButton}" Click="CycleTheme_Click"/>
+                                <Button Content="朗读" Style="{StaticResource GhostButton}" Click="ReadAloud_Click"/>
+                            </UniformGrid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
         </Grid>
+
+        <Border x:Name="OptionsBorder"
+                Grid.Column="3"
+                Background="#F8F5EE"
+                BorderBrush="#40A89F91"
+                BorderThickness="1,0,0,0">
+            <Grid Margin="18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0">
+                    <TextBlock Text="阅读设置"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="本机保存"
+                               Margin="0,4,0,18"
+                               Foreground="{StaticResource TextMuted}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Margin="0,0,0,18">
+                    <TextBlock Text="字号"
+                               Foreground="{StaticResource TextMuted}"
+                               Margin="0,0,0,8"/>
+                    <Slider x:Name="FontSizeSlider"
+                            Minimum="12"
+                            Maximum="32"
+                            TickFrequency="1"
+                            IsSnapToTickEnabled="True"
+                            ValueChanged="FontSizeSlider_ValueChanged"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="2" Margin="0,0,0,18">
+                    <TextBlock Text="主题"
+                               Foreground="{StaticResource TextMuted}"
+                               Margin="0,0,0,8"/>
+                    <ComboBox x:Name="ThemeComboBox"
+                              SelectionChanged="ThemeComboBox_SelectionChanged">
+                        <ComboBoxItem Content="浅墨" Tag="Ink"/>
+                        <ComboBoxItem Content="深夜" Tag="Dark"/>
+                        <ComboBoxItem Content="护眼" Tag="Green"/>
+                        <ComboBoxItem Content="复古" Tag="Vintage"/>
+                    </ComboBox>
+                </StackPanel>
+
+                <TextBlock Grid.Row="3"
+                           Text="小说文件保存在 %LOCALAPPDATA%\NovelShelf\books，不会上传到 GitHub。"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource TextMuted}"/>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

@@ -473,6 +473,11 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
@@ -499,6 +504,67 @@
                 </StackPanel>
 
                 <StackPanel Grid.Row="2" Margin="0,0,0,18">
+                    <TextBlock Text="字体"
+                               Foreground="{StaticResource TextMuted}"
+                               Margin="0,0,0,8"/>
+                    <ComboBox x:Name="FontFamilyComboBox"
+                              SelectionChanged="FontFamilyComboBox_SelectionChanged">
+                        <ComboBoxItem Content="微软雅黑" Tag="Microsoft YaHei UI"/>
+                        <ComboBoxItem Content="宋体" Tag="SimSun"/>
+                        <ComboBoxItem Content="等线" Tag="DengXian"/>
+                        <ComboBoxItem Content="思源宋体" Tag="Source Han Serif SC"/>
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Grid.Row="3" Margin="0,0,0,18">
+                    <TextBlock Text="行距"
+                               Foreground="{StaticResource TextMuted}"
+                               Margin="0,0,0,8"/>
+                    <Slider x:Name="LineSpacingSlider"
+                            Minimum="1.2"
+                            Maximum="2.4"
+                            TickFrequency="0.1"
+                            IsSnapToTickEnabled="True"
+                            ValueChanged="LineSpacingSlider_ValueChanged"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="4" Margin="0,0,0,18">
+                    <TextBlock Text="段距"
+                               Foreground="{StaticResource TextMuted}"
+                               Margin="0,0,0,8"/>
+                    <Slider x:Name="ParagraphSpacingSlider"
+                            Minimum="0.8"
+                            Maximum="2"
+                            TickFrequency="0.1"
+                            IsSnapToTickEnabled="True"
+                            ValueChanged="ParagraphSpacingSlider_ValueChanged"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="5" Margin="0,0,0,18">
+                    <TextBlock Text="页宽"
+                               Foreground="{StaticResource TextMuted}"
+                               Margin="0,0,0,8"/>
+                    <Slider x:Name="PageWidthSlider"
+                            Minimum="620"
+                            Maximum="1080"
+                            TickFrequency="20"
+                            IsSnapToTickEnabled="True"
+                            ValueChanged="PageWidthSlider_ValueChanged"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="6" Margin="0,0,0,18">
+                    <TextBlock Text="页边距"
+                               Foreground="{StaticResource TextMuted}"
+                               Margin="0,0,0,8"/>
+                    <Slider x:Name="PagePaddingSlider"
+                            Minimum="36"
+                            Maximum="120"
+                            TickFrequency="4"
+                            IsSnapToTickEnabled="True"
+                            ValueChanged="PagePaddingSlider_ValueChanged"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="7" Margin="0,0,0,18">
                     <TextBlock Text="主题"
                                Foreground="{StaticResource TextMuted}"
                                Margin="0,0,0,8"/>
@@ -511,7 +577,7 @@
                     </ComboBox>
                 </StackPanel>
 
-                <TextBlock Grid.Row="3"
+                <TextBlock Grid.Row="8"
                            Text="小说文件保存在 %LOCALAPPDATA%\NovelShelf\books，不会上传到 GitHub。"
                            TextWrapping="Wrap"
                            Foreground="{StaticResource TextMuted}"/>

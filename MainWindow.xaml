@@ -218,7 +218,7 @@
                             <Button DockPanel.Dock="Left"
                                     Content="返回"
                                     Style="{StaticResource GhostButton}"
-                                    Click="ToggleLibrary_Click"/>
+                                    Click="ShowHome_Click"/>
                             <Button DockPanel.Dock="Right"
                                     Content="书签"
                                     Style="{StaticResource GhostButton}"
@@ -270,6 +270,197 @@
                     </Grid>
                 </Border>
             </Grid>
+        </Grid>
+
+        <Grid x:Name="HomeSurfaceGrid"
+              Grid.Column="2"
+              Background="#F4F1EA">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="260"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border x:Name="HomeNavBorder"
+                    Grid.Column="0"
+                    Margin="24,28,0,28"
+                    Padding="20"
+                    Background="#DDF8F5EE"
+                    BorderBrush="#50A89F91"
+                    BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Text="我的书架"
+                                   FontSize="24"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock x:Name="HomeLibraryCountText"
+                                   Text="0 本本地小说"
+                                   Margin="0,6,0,20"
+                                   Foreground="{StaticResource TextMuted}"/>
+                    </StackPanel>
+
+                    <Button Grid.Row="1"
+                            Content="导入 TXT 小说"
+                            Click="ImportBook_Click"
+                            Margin="0,0,0,16"/>
+
+                    <StackPanel Grid.Row="2">
+                        <Button Content="书封网格"
+                                Style="{StaticResource GhostButton}"
+                                Click="ShowGridShelf_Click"
+                                Margin="0,0,0,8"/>
+                        <Button Content="列表"
+                                Style="{StaticResource GhostButton}"
+                                Click="ShowListShelf_Click"
+                                Margin="0,0,0,8"/>
+                    </StackPanel>
+
+                    <TextBlock Grid.Row="3"
+                               Text="小说正文只保存在本机 AppData，不会进入 GitHub 仓库。"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource TextMuted}"/>
+                </Grid>
+            </Border>
+
+            <Border x:Name="HomeBooksBorder"
+                    Grid.Column="1"
+                    Margin="24,28,28,28"
+                    Padding="26"
+                    Background="#DDF8F5EE"
+                    BorderBrush="#50A89F91"
+                    BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" Margin="0,0,0,20">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button Content="网格"
+                                    Style="{StaticResource GhostButton}"
+                                    Click="ShowGridShelf_Click"/>
+                            <Button Content="列表"
+                                    Style="{StaticResource GhostButton}"
+                                    Click="ShowListShelf_Click"/>
+                        </StackPanel>
+
+                        <StackPanel>
+                            <TextBlock Text="本地书籍"
+                                       FontSize="28"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="选择一本书开始阅读"
+                                       Margin="0,6,0,0"
+                                       Foreground="{StaticResource TextMuted}"/>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <Grid Grid.Row="1">
+                        <TextBlock x:Name="EmptyShelfText"
+                                   Text="还没有导入小说。"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontSize="18"
+                                   Foreground="{StaticResource TextMuted}"/>
+
+                        <ListBox x:Name="HomeGridBooksList"
+                                 Background="#00000000"
+                                 SelectionChanged="HomeBook_SelectionChanged"
+                                 BorderThickness="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Width="150"
+                                            Height="218"
+                                            Margin="8,8,16,18"
+                                            Padding="12"
+                                            Background="#BFFFFFFF"
+                                            BorderBrush="#40A89F91"
+                                            BorderThickness="1">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Text="{Binding Title}"
+                                                       FontSize="17"
+                                                       FontWeight="SemiBold"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Grid.Row="1"
+                                                       Text="{Binding OriginalFileName}"
+                                                       Margin="0,12,0,0"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Foreground="{StaticResource TextMuted}"/>
+                                            <TextBlock Grid.Row="2"
+                                                       Text="{Binding LastReadAt, StringFormat=最近阅读 {0:MM-dd HH:mm}}"
+                                                       Margin="0,6,0,0"
+                                                       FontSize="12"
+                                                       Foreground="{StaticResource TextMuted}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <ListBox x:Name="HomeTableBooksList"
+                                 Background="#00000000"
+                                 BorderThickness="0"
+                                 Visibility="Collapsed"
+                                 SelectionChanged="HomeBook_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,10"
+                                            Padding="14"
+                                            Background="#8CFFFFFF"
+                                            BorderBrush="#40A89F91"
+                                            BorderThickness="1">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="160"/>
+                                                <ColumnDefinition Width="150"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}"
+                                                           FontSize="17"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TextPrimary}"/>
+                                                <TextBlock Text="{Binding OriginalFileName}"
+                                                           Margin="0,5,0,0"
+                                                           Foreground="{StaticResource TextMuted}"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding ImportedAt, StringFormat=导入 {0:yyyy-MM-dd}}"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{StaticResource TextMuted}"/>
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding LastReadAt, StringFormat=最近 {0:MM-dd HH:mm}}"
+                                                       VerticalAlignment="Center"
+                                                       TextAlignment="Right"
+                                                       Foreground="{StaticResource TextMuted}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Grid>
+            </Border>
         </Grid>
 
         <Border x:Name="OptionsBorder"

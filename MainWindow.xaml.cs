@@ -35,6 +35,8 @@ public partial class MainWindow : Window
         _settings = _store.LoadSettings();
         InitializeComponent();
         BooksList.ItemsSource = _books;
+        HomeGridBooksList.ItemsSource = _books;
+        HomeTableBooksList.ItemsSource = _books;
         ChaptersList.ItemsSource = _chapters;
         ApplySettingsToControls();
         ConfigureClock();
@@ -71,12 +73,8 @@ public partial class MainWindow : Window
             }
         }
 
-        if (_books.Count > 0)
-        {
-            BooksList.SelectedIndex = 0;
-        }
-
         UpdateLibraryCount();
+        ShowHome();
     }
 
     private void ImportBook_Click(object sender, RoutedEventArgs e)
@@ -99,7 +97,7 @@ public partial class MainWindow : Window
             _books.Add(imported);
             _store.Save(_books);
             UpdateLibraryCount();
-            BooksList.SelectedItem = imported;
+            ShowHome();
             StatusText.Text = $"已导入：{imported.Title}";
         }
         catch (Exception ex)
@@ -116,6 +114,18 @@ public partial class MainWindow : Window
         }
     }
 
+    private void HomeBook_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ListBox listBox || listBox.SelectedItem is not BookInfo book)
+        {
+            return;
+        }
+
+        HomeGridBooksList.SelectedItem = null;
+        HomeTableBooksList.SelectedItem = null;
+        OpenBook(book);
+    }
+
     private void ChaptersList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_isNavigatingChapter || ChaptersList.SelectedItem is not ChapterInfo chapter)
@@ -129,6 +139,7 @@ public partial class MainWindow : Window
     private void OpenBook(BookInfo book)
     {
         SaveVisiblePosition();
+        ShowReader();
         _currentBook = book;
         _isLoadingBook = true;
         _lastSelectedChapterIndex = -1;
@@ -264,6 +275,24 @@ public partial class MainWindow : Window
     private void ToggleOptions_Click(object sender, RoutedEventArgs e)
     {
         SetOptionsVisible(!_isOptionsVisible);
+    }
+
+    private void ShowHome_Click(object sender, RoutedEventArgs e)
+    {
+        SaveVisiblePosition();
+        ShowHome();
+    }
+
+    private void ShowGridShelf_Click(object sender, RoutedEventArgs e)
+    {
+        HomeGridBooksList.Visibility = Visibility.Visible;
+        HomeTableBooksList.Visibility = Visibility.Collapsed;
+    }
+
+    private void ShowListShelf_Click(object sender, RoutedEventArgs e)
+    {
+        HomeGridBooksList.Visibility = Visibility.Collapsed;
+        HomeTableBooksList.Visibility = Visibility.Visible;
     }
 
     private void ReaderSurface_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -548,11 +577,29 @@ public partial class MainWindow : Window
         OptionsColumn.Width = visible ? new GridLength(260) : new GridLength(0);
     }
 
+    private void ShowHome()
+    {
+        ControlLayer.Visibility = Visibility.Collapsed;
+        HomeSurfaceGrid.Visibility = Visibility.Visible;
+        ReaderSurfaceGrid.Visibility = Visibility.Collapsed;
+        SetLibraryVisible(false);
+        SetCatalogVisible(false);
+        SetOptionsVisible(false);
+    }
+
+    private void ShowReader()
+    {
+        HomeSurfaceGrid.Visibility = Visibility.Collapsed;
+        ReaderSurfaceGrid.Visibility = Visibility.Visible;
+    }
+
     private void UpdateLibraryCount()
     {
         LibraryCountText.Text = _books.Count == 0
             ? "0 本本地小说"
             : $"{_books.Count} 本本地小说";
+        HomeLibraryCountText.Text = LibraryCountText.Text;
+        EmptyShelfText.Visibility = _books.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void UpdateCatalogCount()
@@ -586,6 +633,11 @@ public partial class MainWindow : Window
         RootGrid.Background = BrushFrom(palette.AppBackground);
         LibraryBorder.Background = BrushFrom(palette.PanelBackground);
         LibraryBorder.BorderBrush = BrushFrom(palette.Border);
+        HomeSurfaceGrid.Background = BrushFrom(palette.AppBackground);
+        HomeNavBorder.Background = BrushFrom(palette.OverlayBackground);
+        HomeNavBorder.BorderBrush = BrushFrom(palette.Border);
+        HomeBooksBorder.Background = BrushFrom(palette.OverlayBackground);
+        HomeBooksBorder.BorderBrush = BrushFrom(palette.Border);
         CatalogBorder.Background = BrushFrom(palette.PanelBackground);
         CatalogBorder.BorderBrush = BrushFrom(palette.Border);
         OptionsBorder.Background = BrushFrom(palette.PanelBackground);
@@ -603,12 +655,16 @@ public partial class MainWindow : Window
         MetaText.Foreground = BrushFrom(palette.MutedText);
         StatusText.Foreground = BrushFrom(palette.MutedText);
         LibraryCountText.Foreground = BrushFrom(palette.MutedText);
+        HomeLibraryCountText.Foreground = BrushFrom(palette.MutedText);
+        EmptyShelfText.Foreground = BrushFrom(palette.MutedText);
         CatalogCountText.Foreground = BrushFrom(palette.MutedText);
         CurrentChapterText.Foreground = BrushFrom(palette.MutedText);
         BottomProgressText.Foreground = BrushFrom(palette.MutedText);
         ClockText.Foreground = BrushFrom(palette.MutedText);
         BooksList.Background = BrushFrom(palette.PanelBackground);
         BooksList.Foreground = BrushFrom(palette.Text);
+        HomeGridBooksList.Foreground = BrushFrom(palette.Text);
+        HomeTableBooksList.Foreground = BrushFrom(palette.Text);
         ChaptersList.Background = BrushFrom(palette.PanelBackground);
         ChaptersList.Foreground = BrushFrom(palette.Text);
     }

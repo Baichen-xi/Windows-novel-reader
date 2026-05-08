@@ -2,8 +2,8 @@ namespace NovelShelf.Models;
 
 public sealed class ReaderSettings
 {
-    public double FontSize { get; set; } = 18;
-    public string FontFamily { get; set; } = "Microsoft YaHei UI";
+    public double FontSize { get; set; } = 20;
+    public string FontFamily { get; set; } = "SimSun";
     public double LineSpacing { get; set; } = 1.8;
     public double ParagraphSpacing { get; set; } = 1.2;
     public double PageWidth { get; set; } = 880;

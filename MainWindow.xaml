@@ -145,6 +145,20 @@
                        Foreground="{StaticResource TextMuted}"
                        Opacity="0.72"/>
 
+            <StackPanel Grid.Row="0"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        Margin="24,0,0,0">
+                <Button Content="返回"
+                        Style="{StaticResource GhostButton}"
+                        Click="ShowHome_Click"/>
+                <Button x:Name="CatalogToggleButton"
+                        Content="目录"
+                        Style="{StaticResource GhostButton}"
+                        Click="ToggleCatalog_Click"/>
+            </StackPanel>
+
             <Border x:Name="ReaderBorder"
                     Grid.Row="1"
                     MaxWidth="880"
@@ -261,7 +275,10 @@
                                     IsMoveToPointEnabled="True"
                                     ValueChanged="ChapterProgressSlider_ValueChanged"/>
                             <UniformGrid Columns="4" Margin="0,12,0,0">
-                                <Button Content="目录" Style="{StaticResource GhostButton}" Click="ToggleCatalog_Click"/>
+                                <Button x:Name="ControlCatalogToggleButton"
+                                        Content="目录"
+                                        Style="{StaticResource GhostButton}"
+                                        Click="ToggleCatalog_Click"/>
                                 <Button Content="设置" Style="{StaticResource GhostButton}" Click="ToggleOptions_Click"/>
                                 <Button Content="模式" Style="{StaticResource GhostButton}" Click="CycleTheme_Click"/>
                                 <Button Content="朗读" Style="{StaticResource GhostButton}" Click="ReadAloud_Click"/>
@@ -492,9 +509,14 @@
                 </StackPanel>
 
                 <StackPanel Grid.Row="1" Margin="0,0,0,18">
-                    <TextBlock Text="字号"
-                               Foreground="{StaticResource TextMuted}"
-                               Margin="0,0,0,8"/>
+                    <DockPanel Margin="0,0,0,8">
+                        <TextBlock Text="字号"
+                                   Foreground="{StaticResource TextMuted}"/>
+                        <TextBlock x:Name="FontSizeValueText"
+                                   Text="20"
+                                   TextAlignment="Right"
+                                   Foreground="{StaticResource TextMuted}"/>
+                    </DockPanel>
                     <Slider x:Name="FontSizeSlider"
                             Minimum="12"
                             Maximum="32"
@@ -517,9 +539,14 @@
                 </StackPanel>
 
                 <StackPanel Grid.Row="3" Margin="0,0,0,18">
-                    <TextBlock Text="行距"
-                               Foreground="{StaticResource TextMuted}"
-                               Margin="0,0,0,8"/>
+                    <DockPanel Margin="0,0,0,8">
+                        <TextBlock Text="行距"
+                                   Foreground="{StaticResource TextMuted}"/>
+                        <TextBlock x:Name="LineSpacingValueText"
+                                   Text="1.8"
+                                   TextAlignment="Right"
+                                   Foreground="{StaticResource TextMuted}"/>
+                    </DockPanel>
                     <Slider x:Name="LineSpacingSlider"
                             Minimum="1.2"
                             Maximum="2.4"
@@ -529,9 +556,14 @@
                 </StackPanel>
 
                 <StackPanel Grid.Row="4" Margin="0,0,0,18">
-                    <TextBlock Text="段距"
-                               Foreground="{StaticResource TextMuted}"
-                               Margin="0,0,0,8"/>
+                    <DockPanel Margin="0,0,0,8">
+                        <TextBlock Text="段距"
+                                   Foreground="{StaticResource TextMuted}"/>
+                        <TextBlock x:Name="ParagraphSpacingValueText"
+                                   Text="1.2"
+                                   TextAlignment="Right"
+                                   Foreground="{StaticResource TextMuted}"/>
+                    </DockPanel>
                     <Slider x:Name="ParagraphSpacingSlider"
                             Minimum="0.8"
                             Maximum="2"
@@ -541,9 +573,14 @@
                 </StackPanel>
 
                 <StackPanel Grid.Row="5" Margin="0,0,0,18">
-                    <TextBlock Text="页宽"
-                               Foreground="{StaticResource TextMuted}"
-                               Margin="0,0,0,8"/>
+                    <DockPanel Margin="0,0,0,8">
+                        <TextBlock Text="页宽"
+                                   Foreground="{StaticResource TextMuted}"/>
+                        <TextBlock x:Name="PageWidthValueText"
+                                   Text="880"
+                                   TextAlignment="Right"
+                                   Foreground="{StaticResource TextMuted}"/>
+                    </DockPanel>
                     <Slider x:Name="PageWidthSlider"
                             Minimum="620"
                             Maximum="1080"
@@ -553,9 +590,14 @@
                 </StackPanel>
 
                 <StackPanel Grid.Row="6" Margin="0,0,0,18">
-                    <TextBlock Text="页边距"
-                               Foreground="{StaticResource TextMuted}"
-                               Margin="0,0,0,8"/>
+                    <DockPanel Margin="0,0,0,8">
+                        <TextBlock Text="页边距"
+                                   Foreground="{StaticResource TextMuted}"/>
+                        <TextBlock x:Name="PagePaddingValueText"
+                                   Text="72"
+                                   TextAlignment="Right"
+                                   Foreground="{StaticResource TextMuted}"/>
+                    </DockPanel>
                     <Slider x:Name="PagePaddingSlider"
                             Minimum="36"
                             Maximum="120"

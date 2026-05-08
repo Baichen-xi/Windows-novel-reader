@@ -677,6 +677,8 @@ public partial class MainWindow : Window
     {
         _isCatalogVisible = visible;
         CatalogColumn.Width = visible ? new GridLength(300) : new GridLength(0);
+        CatalogToggleButton.Content = visible ? "收起目录" : "目录";
+        ControlCatalogToggleButton.Content = visible ? "收起目录" : "目录";
         if (visible && ChaptersList.SelectedItem is ChapterInfo chapter)
         {
             ChaptersList.ScrollIntoView(chapter);
@@ -723,6 +725,7 @@ public partial class MainWindow : Window
 
     private void ApplySettingsToControls()
     {
+        _settings.FontFamily = NormalizeFontFamily(_settings.FontFamily);
         FontSizeSlider.Value = _settings.FontSize;
         LineSpacingSlider.Value = _settings.LineSpacing;
         ParagraphSpacingSlider.Value = _settings.ParagraphSpacing;
@@ -756,6 +759,7 @@ public partial class MainWindow : Window
         ReaderTextBox.SetValue(TextBlock.LineHeightProperty, lineHeight);
         ReaderTextBox.SetValue(TextBlock.LineStackingStrategyProperty, LineStackingStrategy.BlockLineHeight);
         ReaderTextBox.Padding = new Thickness(0, 0, 0, Math.Max(0, (_settings.ParagraphSpacing - 1) * _settings.FontSize));
+        UpdateTypographyValueLabels();
     }
 
     private void ApplyTheme(string theme)
@@ -859,6 +863,24 @@ public partial class MainWindow : Window
         FontFamilyComboBox.SelectedIndex = 0;
     }
 
+    private void UpdateTypographyValueLabels()
+    {
+        if (FontSizeValueText is null ||
+            LineSpacingValueText is null ||
+            ParagraphSpacingValueText is null ||
+            PageWidthValueText is null ||
+            PagePaddingValueText is null)
+        {
+            return;
+        }
+
+        FontSizeValueText.Text = $"{_settings.FontSize:0}px";
+        LineSpacingValueText.Text = $"{_settings.LineSpacing:0.0}";
+        ParagraphSpacingValueText.Text = $"{_settings.ParagraphSpacing:0.0}";
+        PageWidthValueText.Text = $"{_settings.PageWidth:0}px";
+        PagePaddingValueText.Text = $"{_settings.PagePadding:0}px";
+    }
+
     private static string NormalizeTheme(string theme) => theme switch
     {
         "Paper" => "Ink",
@@ -867,6 +889,13 @@ public partial class MainWindow : Window
         "护眼" => "Green",
         "复古" => "Vintage",
         _ => theme
+    };
+
+    private static string NormalizeFontFamily(string fontFamily) => fontFamily switch
+    {
+        "" => "SimSun",
+        "Microsoft YaHei UI" => "SimSun",
+        _ => fontFamily
     };
 
     private int GetLineIndex(int characterIndex)

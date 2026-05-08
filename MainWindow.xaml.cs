@@ -26,8 +26,8 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
-        InitializeComponent();
         _settings = _store.LoadSettings();
+        InitializeComponent();
         BooksList.ItemsSource = _books;
         ChaptersList.ItemsSource = _chapters;
         ApplySettingsToControls();
@@ -258,7 +258,7 @@ public partial class MainWindow : Window
 
     private void FontSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (!IsLoaded && ReaderTextBox is null)
+        if (ReaderTextBox is null)
         {
             return;
         }

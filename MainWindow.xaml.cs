@@ -19,6 +19,9 @@ public partial class MainWindow : Window
     private ScrollViewer? _readerScrollViewer;
     private bool _isLoadingBook;
     private bool _isNavigatingChapter;
+    private bool _isLibraryVisible = true;
+    private bool _isCatalogVisible;
+    private bool _isOptionsVisible = true;
     private int _lastSearchIndex = -1;
 
     public MainWindow()
@@ -124,8 +127,13 @@ public partial class MainWindow : Window
         {
             ReaderTextBox.Text = TextFileReader.Read(book.StoredPath);
             TitleText.Text = book.Title;
+            HeaderBookText.Text = book.Title;
             MetaText.Text = $"来源：{book.OriginalFileName} · 导入时间：{book.ImportedAt:yyyy-MM-dd HH:mm}";
             RefreshChapters(ReaderTextBox.Text);
+            if (_chapters.Count > 0)
+            {
+                SetCatalogVisible(true);
+            }
             NavigateToOffset(book.CharacterOffset, saveToBook: false);
             UpdateStatus();
         }
@@ -217,6 +225,8 @@ public partial class MainWindow : Window
         UpdateCatalogCount();
         ReaderTextBox.Text = "";
         TitleText.Text = "还没有打开小说";
+        HeaderBookText.Text = "本地小说阅读器";
+        CurrentChapterText.Text = "阅读区";
         MetaText.Text = "";
         StatusText.Text = "已从本地书库移除。";
     }
@@ -229,6 +239,21 @@ public partial class MainWindow : Window
     private void FindPrevious_Click(object sender, RoutedEventArgs e)
     {
         FindText(forward: false);
+    }
+
+    private void ToggleLibrary_Click(object sender, RoutedEventArgs e)
+    {
+        SetLibraryVisible(!_isLibraryVisible);
+    }
+
+    private void ToggleCatalog_Click(object sender, RoutedEventArgs e)
+    {
+        SetCatalogVisible(!_isCatalogVisible);
+    }
+
+    private void ToggleOptions_Click(object sender, RoutedEventArgs e)
+    {
+        SetOptionsVisible(!_isOptionsVisible);
     }
 
     private void FontSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -394,7 +419,28 @@ public partial class MainWindow : Window
         var chapterText = ChaptersList.SelectedItem is ChapterInfo chapter
             ? $" · {chapter.Title}"
             : "";
+        CurrentChapterText.Text = ChaptersList.SelectedItem is ChapterInfo currentChapter
+            ? currentChapter.Title
+            : "阅读区";
         StatusText.Text = $"阅读位置：{_currentBook.CharacterOffset:N0} / {ReaderTextBox.Text.Length:N0}{chapterText}";
+    }
+
+    private void SetLibraryVisible(bool visible)
+    {
+        _isLibraryVisible = visible;
+        LibraryColumn.Width = visible ? new GridLength(280) : new GridLength(0);
+    }
+
+    private void SetCatalogVisible(bool visible)
+    {
+        _isCatalogVisible = visible;
+        CatalogColumn.Width = visible ? new GridLength(300) : new GridLength(0);
+    }
+
+    private void SetOptionsVisible(bool visible)
+    {
+        _isOptionsVisible = visible;
+        OptionsColumn.Width = visible ? new GridLength(260) : new GridLength(0);
     }
 
     private void UpdateLibraryCount()
@@ -450,10 +496,15 @@ public partial class MainWindow : Window
         LibraryBorder.BorderBrush = BrushFrom(palette.Border);
         CatalogBorder.Background = BrushFrom(palette.PanelBackground);
         CatalogBorder.BorderBrush = BrushFrom(palette.Border);
+        OptionsBorder.Background = BrushFrom(palette.PanelBackground);
+        OptionsBorder.BorderBrush = BrushFrom(palette.Border);
+        ReaderSurfaceGrid.Background = BrushFrom(palette.AppBackground);
         CatalogHintBorder.Background = BrushFrom(palette.ReaderBackground);
         CatalogHintBorder.BorderBrush = BrushFrom(palette.Border);
         ReaderToolbarBorder.Background = BrushFrom(palette.PanelBackground);
         ReaderToolbarBorder.BorderBrush = BrushFrom(palette.Border);
+        ReaderProgressBorder.Background = BrushFrom(palette.PanelBackground);
+        ReaderProgressBorder.BorderBrush = BrushFrom(palette.Border);
         ReaderBorder.Background = BrushFrom(palette.ReaderBackground);
         ReaderBorder.BorderBrush = BrushFrom(palette.Border);
         ReaderTextBox.Background = BrushFrom(palette.ReaderBackground);
@@ -463,6 +514,8 @@ public partial class MainWindow : Window
         StatusText.Foreground = BrushFrom(palette.MutedText);
         LibraryCountText.Foreground = BrushFrom(palette.MutedText);
         CatalogCountText.Foreground = BrushFrom(palette.MutedText);
+        HeaderBookText.Foreground = BrushFrom(palette.MutedText);
+        CurrentChapterText.Foreground = BrushFrom(palette.MutedText);
         BooksList.Background = BrushFrom(palette.PanelBackground);
         BooksList.Foreground = BrushFrom(palette.Text);
         ChaptersList.Background = BrushFrom(palette.PanelBackground);

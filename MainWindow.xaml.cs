@@ -5,7 +5,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -13,9 +13,13 @@ namespace NovelShelf;
 
 public partial class MainWindow : Window
 {
+    private const int CurrentSettingsVersion = 4;
+    private const int ChapterCacheVersion = 1;
+    private const int FallbackChapterSize = 16000;
     private readonly LibraryStore _store = new();
     private readonly ObservableCollection<BookInfo> _books = new();
     private readonly ObservableCollection<ChapterInfo> _chapters = new();
+    private readonly List<RenderedParagraph> _renderedParagraphs = new();
     private readonly ReaderSettings _settings;
     private BookInfo? _currentBook;
     private string _bookText = "";
@@ -30,9 +34,8 @@ public partial class MainWindow : Window
     private bool _isLibraryVisible;
     private bool _isCatalogVisible;
     private bool _isOptionsVisible;
-    private bool _isUpdatingProgress;
+    private bool _areSettingsControlsReady;
     private int _lastSelectedChapterIndex = -1;
-    private int _lastSearchIndex = -1;
 
     public MainWindow()
     {
@@ -50,7 +53,7 @@ public partial class MainWindow : Window
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         LoadLibrary();
-        _readerScrollViewer = FindVisualChild<ScrollViewer>(ReaderTextBox);
+        _readerScrollViewer = FindVisualChild<ScrollViewer>(ReaderDocumentBox);
         if (_readerScrollViewer is not null)
         {
             _readerScrollViewer.ScrollChanged += (_, _) => ScheduleVisiblePositionSave();
@@ -147,14 +150,11 @@ public partial class MainWindow : Window
         _currentBook = book;
         _isLoadingBook = true;
         _lastSelectedChapterIndex = -1;
-        _lastSearchIndex = -1;
 
         try
         {
             _bookText = TextFileReader.Read(book.StoredPath);
-            TitleText.Text = book.Title;
-            MetaText.Text = $"来源：{book.OriginalFileName} · 导入时间：{book.ImportedAt:yyyy-MM-dd HH:mm}";
-            RefreshChapters(_bookText);
+            RefreshChapters(book, _bookText);
             if (_chapters.Count > 0)
             {
                 SetCatalogVisible(true);
@@ -165,7 +165,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             _bookText = "";
-            ReaderTextBox.Text = "";
+            ClearReaderDocument();
             _chapters.Clear();
             MessageBox.Show(this, ex.Message, "打开失败", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -175,35 +175,14 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RefreshChapters(string text)
+    private void RefreshChapters(BookInfo book, string text)
     {
         _chapters.Clear();
         _lastSelectedChapterIndex = -1;
-        foreach (var chapter in ChapterParser.Extract(text))
+        var chapters = GetChaptersForBook(book, text);
+        foreach (var chapter in chapters)
         {
             _chapters.Add(chapter);
-        }
-
-        if (_chapters.Count > 0 && _chapters[0].CharacterOffset > 0)
-        {
-            _chapters.Insert(0, new ChapterInfo
-            {
-                Title = "开篇",
-                CharacterOffset = 0
-            });
-        }
-
-        if (_chapters.Count == 0 && text.Length > 0)
-        {
-            const int chunkSize = 16000;
-            for (var offset = 0; offset < text.Length; offset += chunkSize)
-            {
-                _chapters.Add(new ChapterInfo
-                {
-                    Title = $"片段 {(offset / chunkSize) + 1}",
-                    CharacterOffset = offset
-                });
-            }
         }
 
         UpdateCatalogCount();
@@ -212,6 +191,79 @@ public partial class MainWindow : Window
         {
             StatusText.Text = "未识别到章节，可以继续作为整本书阅读。";
         }
+    }
+
+    private IReadOnlyList<ChapterInfo> GetChaptersForBook(BookInfo book, string text)
+    {
+        if (IsChapterCacheValid(book))
+        {
+            StatusText.Text = "已从本地缓存载入目录。";
+            return book.Chapters;
+        }
+
+        var chapters = BuildChapterList(text);
+        UpdateChapterCache(book, chapters);
+        _store.Save(_books);
+        StatusText.Text = "已解析并缓存目录。";
+        return chapters;
+    }
+
+    private static List<ChapterInfo> BuildChapterList(string text)
+    {
+        var chapters = ChapterParser.Extract(text).ToList();
+
+        if (chapters.Count > 0 && chapters[0].CharacterOffset > 0)
+        {
+            chapters.Insert(0, new ChapterInfo
+            {
+                Title = "开篇",
+                CharacterOffset = 0
+            });
+        }
+
+        if (chapters.Count == 0 && text.Length > 0)
+        {
+            for (var offset = 0; offset < text.Length; offset += FallbackChapterSize)
+            {
+                chapters.Add(new ChapterInfo
+                {
+                    Title = $"片段 {(offset / FallbackChapterSize) + 1}",
+                    CharacterOffset = offset
+                });
+            }
+        }
+
+        return chapters;
+    }
+
+    private static bool IsChapterCacheValid(BookInfo book)
+    {
+        if (book.Chapters is null ||
+            book.Chapters.Count == 0 ||
+            book.ChapterCacheVersion != ChapterCacheVersion ||
+            !File.Exists(book.StoredPath))
+        {
+            return false;
+        }
+
+        var storedFile = new FileInfo(book.StoredPath);
+        return book.StoredFileSize == storedFile.Length &&
+            book.StoredFileLastWriteTime == storedFile.LastWriteTimeUtc;
+    }
+
+    private static void UpdateChapterCache(BookInfo book, IReadOnlyList<ChapterInfo> chapters)
+    {
+        var storedFile = new FileInfo(book.StoredPath);
+        book.Chapters = chapters
+            .Select(chapter => new ChapterInfo
+            {
+                Title = chapter.Title,
+                CharacterOffset = chapter.CharacterOffset
+            })
+            .ToList();
+        book.ChapterCacheVersion = ChapterCacheVersion;
+        book.StoredFileSize = storedFile.Length;
+        book.StoredFileLastWriteTime = storedFile.LastWriteTimeUtc;
     }
 
     private void PreviousChapter_Click(object sender, RoutedEventArgs e)
@@ -276,21 +328,9 @@ public partial class MainWindow : Window
         _chapters.Clear();
         UpdateLibraryCount();
         UpdateCatalogCount();
-        ReaderTextBox.Text = "";
-        TitleText.Text = "还没有打开小说";
+        ClearReaderDocument();
         CurrentChapterText.Text = "阅读区";
-        MetaText.Text = "";
         StatusText.Text = "已从本地书库移除。";
-    }
-
-    private void FindNext_Click(object sender, RoutedEventArgs e)
-    {
-        FindText(forward: true);
-    }
-
-    private void FindPrevious_Click(object sender, RoutedEventArgs e)
-    {
-        FindText(forward: false);
     }
 
     private void ToggleLibrary_Click(object sender, RoutedEventArgs e)
@@ -326,23 +366,6 @@ public partial class MainWindow : Window
         HomeTableBooksList.Visibility = Visibility.Visible;
     }
 
-    private void ReaderSurface_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
-    {
-        if (e.OriginalSource is DependencyObject source && IsInteractiveElement(source))
-        {
-            return;
-        }
-
-        ControlLayer.Visibility = ControlLayer.Visibility == Visibility.Visible
-            ? Visibility.Collapsed
-            : Visibility.Visible;
-
-        if (ControlLayer.Visibility == Visibility.Visible)
-        {
-            UpdateStatus();
-        }
-    }
-
     private void Bookmark_Click(object sender, RoutedEventArgs e)
     {
         SaveVisiblePosition();
@@ -365,20 +388,9 @@ public partial class MainWindow : Window
         _store.SaveSettings(_settings);
     }
 
-    private void ChapterProgressSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        if (_isUpdatingProgress || _bookText.Length == 0)
-        {
-            return;
-        }
-
-        var offset = (int)Math.Round(_bookText.Length * e.NewValue / 100);
-        NavigateToOffset(offset, saveToBook: true);
-    }
-
     private void FontSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (ReaderTextBox is null)
+        if (!_areSettingsControlsReady || ReaderDocumentBox is null)
         {
             return;
         }
@@ -390,7 +402,9 @@ public partial class MainWindow : Window
 
     private void FontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (FontFamilyComboBox?.SelectedItem is not ComboBoxItem item || item.Tag is not string fontFamily)
+        if (!_areSettingsControlsReady ||
+            FontFamilyComboBox?.SelectedItem is not ComboBoxItem item ||
+            item.Tag is not string fontFamily)
         {
             return;
         }
@@ -402,6 +416,11 @@ public partial class MainWindow : Window
 
     private void LineSpacingSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
+        if (!_areSettingsControlsReady)
+        {
+            return;
+        }
+
         _settings.LineSpacing = e.NewValue;
         ApplyTypography();
         _store.SaveSettings(_settings);
@@ -409,6 +428,11 @@ public partial class MainWindow : Window
 
     private void ParagraphSpacingSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
+        if (!_areSettingsControlsReady)
+        {
+            return;
+        }
+
         _settings.ParagraphSpacing = e.NewValue;
         ApplyTypography();
         _store.SaveSettings(_settings);
@@ -416,6 +440,11 @@ public partial class MainWindow : Window
 
     private void PageWidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
+        if (!_areSettingsControlsReady)
+        {
+            return;
+        }
+
         _settings.PageWidth = e.NewValue;
         ApplyTypography();
         _store.SaveSettings(_settings);
@@ -423,6 +452,11 @@ public partial class MainWindow : Window
 
     private void PagePaddingSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
+        if (!_areSettingsControlsReady)
+        {
+            return;
+        }
+
         _settings.PagePadding = e.NewValue;
         ApplyTypography();
         _store.SaveSettings(_settings);
@@ -430,7 +464,9 @@ public partial class MainWindow : Window
 
     private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (ThemeComboBox.SelectedItem is not ComboBoxItem item || item.Tag is not string theme)
+        if (!_areSettingsControlsReady ||
+            ThemeComboBox.SelectedItem is not ComboBoxItem item ||
+            item.Tag is not string theme)
         {
             return;
         }
@@ -438,67 +474,6 @@ public partial class MainWindow : Window
         _settings.Theme = theme;
         ApplyTheme(theme);
         _store.SaveSettings(_settings);
-    }
-
-    private void ReaderTextBox_SelectionChanged(object sender, RoutedEventArgs e)
-    {
-        if (!_isLoadingBook)
-        {
-            ScheduleVisiblePositionSave();
-        }
-    }
-
-    private void FindText(bool forward)
-    {
-        var query = SearchBox.Text.Trim();
-        var text = _bookText;
-        if (query.Length == 0 || text.Length == 0)
-        {
-            StatusText.Text = "请输入要查找的关键词。";
-            return;
-        }
-
-        var comparison = StringComparison.CurrentCultureIgnoreCase;
-        var start = _currentBook?.CharacterOffset ?? 0;
-        int index;
-
-        if (forward)
-        {
-            start = _lastSearchIndex >= 0 ? _lastSearchIndex + query.Length : start;
-            if (start >= text.Length)
-            {
-                start = 0;
-            }
-
-            index = text.IndexOf(query, start, comparison);
-            if (index < 0 && start > 0)
-            {
-                index = text.IndexOf(query, 0, comparison);
-            }
-        }
-        else
-        {
-            start = _lastSearchIndex > 0 ? _lastSearchIndex - 1 : Math.Max(0, start - 1);
-            index = text.LastIndexOf(query, start, comparison);
-            if (index < 0 && start < text.Length - 1)
-            {
-                index = text.LastIndexOf(query, text.Length - 1, comparison);
-            }
-        }
-
-        if (index < 0)
-        {
-            StatusText.Text = $"没有找到：{query}";
-            return;
-        }
-
-        _lastSearchIndex = index;
-        ReaderTextBox.Focus();
-        NavigateToOffset(index, saveToBook: true);
-        var selectionStart = Math.Clamp(index - _currentChapterStartOffset, 0, ReaderTextBox.Text.Length);
-        var selectionLength = Math.Min(query.Length, Math.Max(0, ReaderTextBox.Text.Length - selectionStart));
-        ReaderTextBox.Select(selectionStart, selectionLength);
-        StatusText.Text = $"已找到：{query}";
     }
 
     private void NavigateToOffset(int characterOffset, bool saveToBook)
@@ -512,9 +487,8 @@ public partial class MainWindow : Window
         var chapterIndex = FindChapterIndex(offset);
         LoadChapter(chapterIndex);
 
-        var localOffset = Math.Clamp(offset - _currentChapterStartOffset, 0, ReaderTextBox.Text.Length);
-        ReaderTextBox.CaretIndex = localOffset;
-        ReaderTextBox.ScrollToLine(GetLineIndex(localOffset));
+        var localOffset = Math.Clamp(offset - _currentChapterStartOffset, 0, GetCurrentChapterLength());
+        ScrollToLocalOffset(localOffset);
 
         if (saveToBook && _currentBook is not null)
         {
@@ -529,22 +503,12 @@ public partial class MainWindow : Window
 
     private void SaveVisiblePosition()
     {
-        if (_currentBook is null || _isLoadingBook || ReaderTextBox.Text.Length == 0 || _bookText.Length == 0)
+        if (_currentBook is null || _isLoadingBook || _renderedParagraphs.Count == 0 || _bookText.Length == 0)
         {
             return;
         }
 
-        var firstVisibleLine = _readerScrollViewer is null
-            ? GetLineIndex(ReaderTextBox.CaretIndex)
-            : Math.Max(0, ReaderTextBox.GetFirstVisibleLineIndex());
-
-        var offset = ReaderTextBox.GetCharacterIndexFromLineIndex(firstVisibleLine);
-        if (offset < 0)
-        {
-            offset = ReaderTextBox.CaretIndex;
-        }
-
-        var globalOffset = _currentChapterStartOffset + offset;
+        var globalOffset = _currentChapterStartOffset + GetVisibleLocalOffset();
         _currentBook.CharacterOffset = Math.Clamp(globalOffset, 0, _bookText.Length);
         _currentBook.LastReadAt = DateTimeOffset.Now;
         UpdateSelectedChapter(_currentBook.CharacterOffset);
@@ -553,7 +517,7 @@ public partial class MainWindow : Window
 
     private void ScheduleVisiblePositionSave()
     {
-        if (_currentBook is null || _isLoadingBook || ReaderTextBox.Text.Length == 0 || _bookText.Length == 0)
+        if (_currentBook is null || _isLoadingBook || _renderedParagraphs.Count == 0 || _bookText.Length == 0)
         {
             return;
         }
@@ -622,7 +586,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (chapterIndex == _currentChapterIndex && ReaderTextBox.Text.Length > 0)
+        if (chapterIndex == _currentChapterIndex && _renderedParagraphs.Count > 0)
         {
             return;
         }
@@ -634,8 +598,145 @@ public partial class MainWindow : Window
             : _bookText.Length;
 
         var length = Math.Max(0, _currentChapterEndOffset - _currentChapterStartOffset);
-        ReaderTextBox.Text = _bookText.Substring(_currentChapterStartOffset, length);
+        RenderChapter(_bookText.Substring(_currentChapterStartOffset, length));
+    }
+
+    private void RenderChapter(string chapterText)
+    {
+        ClearReaderDocument();
+
+        foreach (var part in SplitParagraphs(chapterText))
+        {
+            var paragraph = new Paragraph(new Run(part.Text));
+            ReaderDocument.Blocks.Add(paragraph);
+            var rendered = new RenderedParagraph(paragraph, part.LocalStartOffset, part.Text.Length);
+            _renderedParagraphs.Add(rendered);
+            ApplyParagraphTypography(rendered);
+        }
+
+        if (_renderedParagraphs.Count == 0)
+        {
+            var paragraph = new Paragraph(new Run(" "));
+            ReaderDocument.Blocks.Add(paragraph);
+            var rendered = new RenderedParagraph(paragraph, 0, 0);
+            _renderedParagraphs.Add(rendered);
+            ApplyParagraphTypography(rendered);
+        }
+
         ApplyTypography();
+    }
+
+    private void ClearReaderDocument()
+    {
+        _renderedParagraphs.Clear();
+        ReaderDocument.Blocks.Clear();
+    }
+
+    private static IEnumerable<ParagraphPart> SplitParagraphs(string text)
+    {
+        var offset = 0;
+        while (offset < text.Length)
+        {
+            var lineEnd = text.IndexOfAny(new[] { '\r', '\n' }, offset);
+            if (lineEnd < 0)
+            {
+                lineEnd = text.Length;
+            }
+
+            var line = text[offset..lineEnd];
+            var leading = line.Length - line.TrimStart().Length;
+            var trimmed = line.Trim();
+            if (trimmed.Length > 0)
+            {
+                yield return new ParagraphPart(offset + leading, trimmed);
+            }
+
+            if (lineEnd >= text.Length)
+            {
+                break;
+            }
+
+            offset = lineEnd + 1;
+            if (text[lineEnd] == '\r' && offset < text.Length && text[offset] == '\n')
+            {
+                offset++;
+            }
+        }
+    }
+
+    private int GetCurrentChapterLength() =>
+        Math.Max(0, _currentChapterEndOffset - _currentChapterStartOffset);
+
+    private int GetVisibleLocalOffset()
+    {
+        var pointer = ReaderDocumentBox.GetPositionFromPoint(new Point(4, 4), snapToText: true);
+        var paragraph = pointer?.Paragraph;
+        if (paragraph is not null)
+        {
+            var rendered = _renderedParagraphs.FirstOrDefault(item => ReferenceEquals(item.Paragraph, paragraph));
+            if (rendered is not null)
+            {
+                var textBeforePointer = new TextRange(paragraph.ContentStart, pointer!).Text.Length;
+                return rendered.LocalStartOffset + Math.Clamp(textBeforePointer, 0, rendered.TextLength);
+            }
+        }
+
+        return _currentBook is null
+            ? 0
+            : Math.Clamp(_currentBook.CharacterOffset - _currentChapterStartOffset, 0, GetCurrentChapterLength());
+    }
+
+    private void ScrollToLocalOffset(int localOffset)
+    {
+        if (_renderedParagraphs.Count == 0)
+        {
+            return;
+        }
+
+        var rendered = _renderedParagraphs[0];
+        foreach (var candidate in _renderedParagraphs)
+        {
+            if (candidate.LocalStartOffset > localOffset)
+            {
+                break;
+            }
+
+            rendered = candidate;
+        }
+
+        var offsetInParagraph = Math.Clamp(localOffset - rendered.LocalStartOffset, 0, rendered.TextLength);
+        var pointer = GetTextPointerAtTextOffset(rendered.Paragraph.ContentStart, offsetInParagraph)
+            ?? rendered.Paragraph.ContentStart;
+
+        ReaderDocumentBox.CaretPosition = pointer;
+        ReaderDocumentBox.Selection.Select(pointer, pointer);
+        ReaderDocumentBox.Focus();
+        Dispatcher.BeginInvoke(() => rendered.Paragraph.BringIntoView(), DispatcherPriority.Background);
+    }
+
+    private static TextPointer? GetTextPointerAtTextOffset(TextPointer start, int textOffset)
+    {
+        var remaining = Math.Max(0, textOffset);
+        var navigator = start;
+        var end = start.Paragraph?.ContentEnd ?? start;
+
+        while (navigator is not null && navigator.CompareTo(end) < 0)
+        {
+            if (navigator.GetPointerContext(LogicalDirection.Forward) == TextPointerContext.Text)
+            {
+                var run = navigator.GetTextInRun(LogicalDirection.Forward);
+                if (remaining <= run.Length)
+                {
+                    return navigator.GetPositionAtOffset(remaining, LogicalDirection.Forward);
+                }
+
+                remaining -= run.Length;
+            }
+
+            navigator = navigator.GetNextContextPosition(LogicalDirection.Forward);
+        }
+
+        return start;
     }
 
     private void UpdateStatus()
@@ -658,13 +759,6 @@ public partial class MainWindow : Window
 
         BottomProgressText.Text = $"{percentage:P0}";
         StatusText.Text = $"阅读位置：{_currentBook.CharacterOffset:N0} / {_bookText.Length:N0}{chapterText}";
-
-        if (ControlLayer.Visibility == Visibility.Visible)
-        {
-            _isUpdatingProgress = true;
-            ChapterProgressSlider.Value = percentage * 100;
-            _isUpdatingProgress = false;
-        }
     }
 
     private void SetLibraryVisible(bool visible)
@@ -678,7 +772,6 @@ public partial class MainWindow : Window
         _isCatalogVisible = visible;
         CatalogColumn.Width = visible ? new GridLength(300) : new GridLength(0);
         CatalogToggleButton.Content = visible ? "收起目录" : "目录";
-        ControlCatalogToggleButton.Content = visible ? "收起目录" : "目录";
         if (visible && ChaptersList.SelectedItem is ChapterInfo chapter)
         {
             ChaptersList.ScrollIntoView(chapter);
@@ -688,12 +781,12 @@ public partial class MainWindow : Window
     private void SetOptionsVisible(bool visible)
     {
         _isOptionsVisible = visible;
-        OptionsColumn.Width = visible ? new GridLength(260) : new GridLength(0);
+        OptionsColumn.Width = visible ? new GridLength(280) : new GridLength(0);
+        OptionsToggleButton.Content = visible ? "收起设置" : "设置";
     }
 
     private void ShowHome()
     {
-        ControlLayer.Visibility = Visibility.Collapsed;
         HomeSurfaceGrid.Visibility = Visibility.Visible;
         ReaderSurfaceGrid.Visibility = Visibility.Collapsed;
         SetLibraryVisible(false);
@@ -725,7 +818,10 @@ public partial class MainWindow : Window
 
     private void ApplySettingsToControls()
     {
+        MigrateReaderSettings();
         _settings.FontFamily = NormalizeFontFamily(_settings.FontFamily);
+        _settings.FontSize = NormalizeFontSize(_settings.FontSize);
+        _settings.PageWidth = NormalizePageWidth(_settings.PageWidth);
         FontSizeSlider.Value = _settings.FontSize;
         LineSpacingSlider.Value = _settings.LineSpacing;
         ParagraphSpacingSlider.Value = _settings.ParagraphSpacing;
@@ -737,17 +833,41 @@ public partial class MainWindow : Window
         SelectThemeComboItem(_settings.Theme);
 
         ApplyTheme(_settings.Theme);
+        _areSettingsControlsReady = true;
+        _store.SaveSettings(_settings);
     }
 
-    private void ApplyTypography()
+    private void MigrateReaderSettings()
     {
-        if (ReaderTextBox is null || ReaderBorder is null)
+        if (_settings.SettingsVersion >= CurrentSettingsVersion)
         {
             return;
         }
 
-        ReaderTextBox.FontSize = _settings.FontSize;
-        ReaderTextBox.FontFamily = new FontFamily(_settings.FontFamily);
+        _settings.FontSize = 25;
+        _settings.FontFamily = "SimSun";
+        _settings.LineSpacing = 1.8;
+        _settings.ParagraphSpacing = 1.2;
+        _settings.PageWidth = 3200;
+        _settings.PagePadding = 72;
+        _settings.SettingsVersion = CurrentSettingsVersion;
+    }
+
+    private void ApplyTypography()
+    {
+        if (ReaderDocumentBox is null || ReaderDocument is null || ReaderBorder is null)
+        {
+            return;
+        }
+
+        var fontFamily = new FontFamily(_settings.FontFamily);
+        ReaderDocumentBox.FontSize = _settings.FontSize;
+        ReaderDocumentBox.FontFamily = fontFamily;
+        ReaderDocument.FontSize = _settings.FontSize;
+        ReaderDocument.FontFamily = fontFamily;
+        ReaderDocument.LineHeight = _settings.FontSize * _settings.LineSpacing;
+        ReaderDocument.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+        ReaderDocument.ColumnWidth = 100000;
         ReaderBorder.MaxWidth = _settings.PageWidth;
         ReaderBorder.Padding = new Thickness(
             _settings.PagePadding,
@@ -755,11 +875,37 @@ public partial class MainWindow : Window
             _settings.PagePadding,
             Math.Max(28, _settings.PagePadding * 0.64));
 
-        var lineHeight = _settings.FontSize * _settings.LineSpacing;
-        ReaderTextBox.SetValue(TextBlock.LineHeightProperty, lineHeight);
-        ReaderTextBox.SetValue(TextBlock.LineStackingStrategyProperty, LineStackingStrategy.BlockLineHeight);
-        ReaderTextBox.Padding = new Thickness(0, 0, 0, Math.Max(0, (_settings.ParagraphSpacing - 1) * _settings.FontSize));
+        foreach (var rendered in _renderedParagraphs)
+        {
+            ApplyParagraphTypography(rendered);
+        }
+
         UpdateTypographyValueLabels();
+    }
+
+    private void ApplyParagraphTypography(RenderedParagraph rendered)
+    {
+        var paragraph = rendered.Paragraph;
+        var isHeading = IsCurrentChapterHeading(rendered);
+        paragraph.FontSize = isHeading ? _settings.FontSize + 3 : _settings.FontSize;
+        paragraph.FontFamily = new FontFamily(_settings.FontFamily);
+        paragraph.LineHeight = _settings.FontSize * _settings.LineSpacing;
+        paragraph.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+        paragraph.Margin = new Thickness(0, 0, 0, Math.Max(0, (_settings.ParagraphSpacing - 1) * _settings.FontSize));
+        paragraph.TextIndent = isHeading ? 0 : _settings.FontSize * 2;
+        paragraph.TextAlignment = isHeading ? TextAlignment.Center : TextAlignment.Left;
+        paragraph.FontWeight = isHeading ? FontWeights.SemiBold : FontWeights.Normal;
+    }
+
+    private bool IsCurrentChapterHeading(RenderedParagraph rendered)
+    {
+        if (rendered.LocalStartOffset > 8 || _currentChapterIndex < 0 || _currentChapterIndex >= _chapters.Count)
+        {
+            return false;
+        }
+
+        var text = new TextRange(rendered.Paragraph.ContentStart, rendered.Paragraph.ContentEnd).Text.Trim();
+        return string.Equals(text, _chapters[_currentChapterIndex].Title, StringComparison.CurrentCultureIgnoreCase);
     }
 
     private void ApplyTheme(string theme)
@@ -790,12 +936,11 @@ public partial class MainWindow : Window
         CatalogHintBorder.BorderBrush = BrushFrom(palette.Border);
         ReaderBorder.Background = BrushFrom(palette.ReaderBackground);
         ReaderBorder.BorderBrush = BrushFrom(palette.ReaderBackground);
-        ReaderTextBox.Background = BrushFrom(palette.ReaderBackground);
-        ReaderTextBox.Foreground = BrushFrom(palette.Text);
-        ControlPanelBorder.Background = BrushFrom(palette.OverlayBackground);
-        ControlPanelBorder.BorderBrush = BrushFrom(palette.Border);
+        ReaderDocumentBox.Background = BrushFrom(palette.ReaderBackground);
+        ReaderDocumentBox.Foreground = BrushFrom(palette.Text);
+        ReaderDocument.Background = BrushFrom(palette.ReaderBackground);
+        ReaderDocument.Foreground = BrushFrom(palette.Text);
         SetTextForeground(RootGrid, BrushFrom(palette.Text));
-        MetaText.Foreground = BrushFrom(palette.MutedText);
         StatusText.Foreground = BrushFrom(palette.MutedText);
         LibraryCountText.Foreground = BrushFrom(palette.MutedText);
         HomeLibraryCountText.Foreground = BrushFrom(palette.MutedText);
@@ -898,42 +1043,13 @@ public partial class MainWindow : Window
         _ => fontFamily
     };
 
-    private int GetLineIndex(int characterIndex)
-    {
-        if (ReaderTextBox.Text.Length == 0)
-        {
-            return 0;
-        }
+    private static double NormalizeFontSize(double fontSize) =>
+        Math.Abs(fontSize - 20) < 0.01 ? 25 : Math.Clamp(fontSize, 12, 36);
 
-        return Math.Max(0, ReaderTextBox.GetLineIndexFromCharacterIndex(characterIndex));
-    }
+    private static double NormalizePageWidth(double pageWidth) =>
+        Math.Abs(pageWidth - 880) < 0.01 ? 3200 : Math.Clamp(pageWidth, 960, 3200);
 
     private static Brush BrushFrom(string color) => (Brush)new BrushConverter().ConvertFromString(color)!;
-
-    private static bool IsInteractiveElement(DependencyObject source)
-    {
-        while (source is not null)
-        {
-            if (source is FrameworkElement { Name: "ReaderTextBox" })
-            {
-                return false;
-            }
-
-            if (source is FrameworkElement { Name: "ControlPanelBorder" })
-            {
-                return true;
-            }
-
-            if (source is ButtonBase or TextBox or Slider or ComboBox or ListBox)
-            {
-                return true;
-            }
-
-            source = VisualTreeHelper.GetParent(source);
-        }
-
-        return false;
-    }
 
     private static void SetTextForeground(DependencyObject parent, Brush brush)
     {
@@ -968,6 +1084,10 @@ public partial class MainWindow : Window
 
         return null;
     }
+
+    private sealed record RenderedParagraph(Paragraph Paragraph, int LocalStartOffset, int TextLength);
+
+    private readonly record struct ParagraphPart(int LocalStartOffset, string Text);
 
     private sealed record ThemePalette(
         string AppBackground,

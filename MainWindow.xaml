@@ -128,8 +128,7 @@
         </Border>
 
         <Grid x:Name="ReaderSurfaceGrid"
-              Grid.Column="2"
-              MouseLeftButtonUp="ReaderSurface_Click">
+              Grid.Column="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="42"/>
                 <RowDefinition Height="*"/>
@@ -161,37 +160,45 @@
 
             <Border x:Name="ReaderBorder"
                     Grid.Row="1"
-                    MaxWidth="880"
-                    MinWidth="620"
-                    HorizontalAlignment="Center"
+                    MaxWidth="3200"
+                    HorizontalAlignment="Stretch"
                     Padding="72,46"
                     Background="#F4F1EA"
                     BorderBrush="#00000000"
                     BorderThickness="1">
-                <TextBox x:Name="ReaderTextBox"
-                         AcceptsReturn="True"
-                         AcceptsTab="True"
-                         Background="#F4F1EA"
-                         BorderThickness="0"
-                         FontFamily="Microsoft YaHei UI"
-                         FontSize="18"
-                         Foreground="#2C2C2C"
-                         IsReadOnly="True"
-                         IsUndoEnabled="False"
-                         TextWrapping="Wrap"
-                         VerticalScrollBarVisibility="Hidden"
-                         HorizontalScrollBarVisibility="Disabled"
-                         SelectionChanged="ReaderTextBox_SelectionChanged"/>
+                <RichTextBox x:Name="ReaderDocumentBox"
+                             Background="#F4F1EA"
+                             BorderThickness="0"
+                             FontFamily="SimSun"
+                             FontSize="25"
+                             Foreground="#2C2C2C"
+                             IsReadOnly="True"
+                             IsUndoEnabled="False"
+                             VerticalScrollBarVisibility="Hidden"
+                             HorizontalScrollBarVisibility="Disabled">
+                    <FlowDocument x:Name="ReaderDocument"
+                                  PagePadding="0"
+                                  ColumnWidth="100000"
+                                  Background="#F4F1EA"/>
+                </RichTextBox>
             </Border>
 
             <DockPanel Grid.Row="2" Margin="36,0" LastChildFill="True">
-                <TextBlock x:Name="BottomProgressText"
-                           DockPanel.Dock="Left"
-                           Text="0%"
-                           VerticalAlignment="Center"
-                           FontSize="12"
-                           Foreground="{StaticResource TextMuted}"
-                           Opacity="0.72"/>
+                <StackPanel DockPanel.Dock="Left"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button x:Name="OptionsToggleButton"
+                            Content="设置"
+                            Style="{StaticResource GhostButton}"
+                            Click="ToggleOptions_Click"
+                            Margin="0,0,12,0"/>
+                    <TextBlock x:Name="BottomProgressText"
+                               Text="0%"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{StaticResource TextMuted}"
+                               Opacity="0.72"/>
+                </StackPanel>
                 <TextBlock x:Name="ClockText"
                            DockPanel.Dock="Right"
                            Text="--:--"
@@ -207,86 +214,6 @@
                            Foreground="{StaticResource TextMuted}"
                            Opacity="0.72"/>
             </DockPanel>
-
-            <Grid x:Name="ControlLayer"
-                  Grid.RowSpan="3"
-                  Visibility="Collapsed"
-                  Background="#66000000">
-                <Border x:Name="ControlPanelBorder"
-                        Width="760"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Stretch"
-                        Margin="0,28"
-                        Padding="22"
-                        Background="#DDF8F5EE"
-                        BorderBrush="#50A89F91"
-                        BorderThickness="1">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <DockPanel Grid.Row="0" LastChildFill="True">
-                            <Button DockPanel.Dock="Left"
-                                    Content="返回"
-                                    Style="{StaticResource GhostButton}"
-                                    Click="ShowHome_Click"/>
-                            <Button DockPanel.Dock="Right"
-                                    Content="书签"
-                                    Style="{StaticResource GhostButton}"
-                                    Click="Bookmark_Click"/>
-                            <StackPanel HorizontalAlignment="Center">
-                                <TextBlock x:Name="TitleText"
-                                           Text="还没有打开小说"
-                                           FontSize="18"
-                                           FontWeight="SemiBold"
-                                           TextAlignment="Center"
-                                           Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock x:Name="MetaText"
-                                           Margin="0,4,0,0"
-                                           TextAlignment="Center"
-                                           Foreground="{StaticResource TextMuted}"/>
-                            </StackPanel>
-                        </DockPanel>
-
-                        <StackPanel Grid.Row="1"
-                                    VerticalAlignment="Center"
-                                    HorizontalAlignment="Center"
-                                    Width="520">
-                            <TextBox x:Name="SearchBox"
-                                     Height="34"
-                                     VerticalContentAlignment="Center"
-                                     ToolTip="输入关键词后搜索"/>
-                            <StackPanel Orientation="Horizontal"
-                                        HorizontalAlignment="Center"
-                                        Margin="0,12,0,0">
-                                <Button Content="查找" Click="FindNext_Click"/>
-                                <Button Content="上一个" Style="{StaticResource GhostButton}" Click="FindPrevious_Click"/>
-                            </StackPanel>
-                        </StackPanel>
-
-                        <StackPanel Grid.Row="2">
-                            <Slider x:Name="ChapterProgressSlider"
-                                    Minimum="0"
-                                    Maximum="100"
-                                    Height="30"
-                                    IsMoveToPointEnabled="True"
-                                    ValueChanged="ChapterProgressSlider_ValueChanged"/>
-                            <UniformGrid Columns="4" Margin="0,12,0,0">
-                                <Button x:Name="ControlCatalogToggleButton"
-                                        Content="目录"
-                                        Style="{StaticResource GhostButton}"
-                                        Click="ToggleCatalog_Click"/>
-                                <Button Content="设置" Style="{StaticResource GhostButton}" Click="ToggleOptions_Click"/>
-                                <Button Content="模式" Style="{StaticResource GhostButton}" Click="CycleTheme_Click"/>
-                                <Button Content="朗读" Style="{StaticResource GhostButton}" Click="ReadAloud_Click"/>
-                            </UniformGrid>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-            </Grid>
         </Grid>
 
         <Grid x:Name="HomeSurfaceGrid"
@@ -519,7 +446,7 @@
                     </DockPanel>
                     <Slider x:Name="FontSizeSlider"
                             Minimum="12"
-                            Maximum="32"
+                            Maximum="36"
                             TickFrequency="1"
                             IsSnapToTickEnabled="True"
                             ValueChanged="FontSizeSlider_ValueChanged"/>
@@ -574,17 +501,17 @@
 
                 <StackPanel Grid.Row="5" Margin="0,0,0,18">
                     <DockPanel Margin="0,0,0,8">
-                        <TextBlock Text="页宽"
+                        <TextBlock Text="正文宽度"
                                    Foreground="{StaticResource TextMuted}"/>
                         <TextBlock x:Name="PageWidthValueText"
-                                   Text="880"
+                                   Text="3200"
                                    TextAlignment="Right"
                                    Foreground="{StaticResource TextMuted}"/>
                     </DockPanel>
                     <Slider x:Name="PageWidthSlider"
-                            Minimum="620"
-                            Maximum="1080"
-                            TickFrequency="20"
+                            Minimum="960"
+                            Maximum="3200"
+                            TickFrequency="40"
                             IsSnapToTickEnabled="True"
                             ValueChanged="PageWidthSlider_ValueChanged"/>
                 </StackPanel>

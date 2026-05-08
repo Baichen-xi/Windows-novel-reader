@@ -73,6 +73,7 @@ public sealed class LibraryStore
         var extension = Path.GetExtension(sourcePath);
         var storedPath = Path.Combine(BooksDirectory, $"{id}{extension}");
         File.Copy(sourcePath, storedPath, overwrite: false);
+        var storedFile = new FileInfo(storedPath);
 
         return new BookInfo
         {
@@ -82,7 +83,9 @@ public sealed class LibraryStore
             StoredPath = storedPath,
             ImportedAt = DateTimeOffset.Now,
             LastReadAt = DateTimeOffset.Now,
-            CharacterOffset = 0
+            CharacterOffset = 0,
+            StoredFileSize = storedFile.Length,
+            StoredFileLastWriteTime = storedFile.LastWriteTimeUtc
         };
     }
 
